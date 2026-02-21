@@ -64,11 +64,10 @@ export async function POST(req: Request) {
     
     // 1) Read multiple local files (demo-only)
     // You can list as many files as you want here
-    const filePaths = [
+    const filePaths: string[] = [
       // "/Users/isaacsze/Desktop/HackLDN 2026/cognilink/resource/test.txt",
     ];
 
-<<<<<<< HEAD
     const fileParts: { fileData: { fileUri: string; mimeType: string } }[] = [];
 
     for (const filePath of filePaths) {
@@ -81,33 +80,21 @@ export async function POST(req: Request) {
         else if (ext === '.png') mimeType = 'image/png';
         else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
 
-        const uploadResponse = await ai.files.upload({
-          file: {
-            data: fileBuffer,
-            mimeType,
-          },
+        // Create a Blob from the file buffer
+        const fileBlob = new Blob([fileBuffer], { type: mimeType });
+        
+        const uploadedFile = await ai.files.upload({
+          file: fileBlob,
           config: {
             displayName: path.basename(filePath),
             mimeType,
           }
-=======
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                systemInstruction: `You are an expert AI assistant inside the 'CogniLink' document analysis platform.
-                Your goals:
-                1. Help the user understand their documents and answer their questions clearly.
-                2. If a user asks about inappropriate, offensive, or harmful topics, politely refuse to answer.
-                3. Keep responses highly professional, concise, and focused on academics or knowledge.`,
-            }
->>>>>>> origin/main
         });
 
         fileParts.push({
           fileData: {
-            fileUri: uploadResponse.file.uri,
-            mimeType: uploadResponse.file.mimeType,
+            fileUri: uploadedFile.uri || '',
+            mimeType: uploadedFile.mimeType || mimeType,
           },
         });
       } catch (err) {
@@ -152,7 +139,8 @@ A is singly connected to B, so it is a pre-requisite of B
       ],
       config: {
         responseMimeType: 'application/json',
-        responseSchema: zodToJsonSchema(adjmatschema),
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        responseSchema: zodToJsonSchema(adjmatschema as any),
       },
     });
 
