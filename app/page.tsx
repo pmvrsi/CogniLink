@@ -23,7 +23,7 @@ export default function HomePage() {
 
           <p className="max-w-xl mx-auto text-lg md:text-xl text-gray-400 mb-12 leading-relaxed">
             [system_scan]: CogniLink builds a conversational knowledge graph from your resources.
-            Ask anything, summarize instantly, and learn via voice.
+            Ask anything, summarise instantly, and learn via voice.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-24">
@@ -173,7 +173,7 @@ export default function HomePage() {
             Your books <br /> are waiting.
           </h2>
           <button className="bg-white text-[#023047] px-12 py-6 rounded-full font-black text-xl hover:bg-[#8ecae6] transition-all shadow-[0_0_50px_rgba(255,255,255,0.1)] active:scale-95">
-            INITIALIZE FREE TRIAL
+            INITIALISE FREE TRIAL
           </button>
           <p className="mt-8 text-gray-500 font-bold tracking-widest text-xs">
             LIMIT: 5 DOCUMENTS / SESSION

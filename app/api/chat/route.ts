@@ -68,6 +68,7 @@ export async function POST(req: Request) {
       // "/Users/isaacsze/Desktop/HackLDN 2026/cognilink/resource/test.txt",
     ];
 
+<<<<<<< HEAD
     const fileParts: { fileData: { fileUri: string; mimeType: string } }[] = [];
 
     for (const filePath of filePaths) {
@@ -89,6 +90,18 @@ export async function POST(req: Request) {
             displayName: path.basename(filePath),
             mimeType,
           }
+=======
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                systemInstruction: `You are an expert AI assistant inside the 'CogniLink' document analysis platform.
+                Your goals:
+                1. Help the user understand their documents and answer their questions clearly.
+                2. If a user asks about inappropriate, offensive, or harmful topics, politely refuse to answer.
+                3. Keep responses highly professional, concise, and focused on academics or knowledge.`,
+            }
+>>>>>>> origin/main
         });
 
         fileParts.push({
