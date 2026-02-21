@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CogniLink
+
+**Connect your books. Master every topic.**
+
+CogniLink is an AI-powered knowledge management platform that builds conversational knowledge graphs from your resources. Ask anything, summarize instantly, and learn via voice.
+
+## Features
+
+- **Topic Extraction** - Tell CogniLink what you need to know and receive structured summaries formatted for high-retention learning
+- **Voice Q&A** - Speak to your library and ask follow-up questions hands-free
+- **OCR Engine** - High-speed character recognition for handwritten notes and old textbooks
+- **Verification** - Every claim is cited with direct links to the original page in your PDF
+
+## Tech Stack
+
+- **Framework**: [Next.js 16](https://nextjs.org/) with App Router
+- **Language**: TypeScript
+- **Styling**: [Tailwind CSS 4](https://tailwindcss.com/)
+- **Authentication**: [Supabase Auth](https://supabase.com/auth)
+- **Icons**: [Lucide React](https://lucide.dev/)
+- **Font**: Ubuntu Mono
+
+## Project Structure
+
+```
+cognilink/
+├── app/
+│   ├── auth/
+│   │   └── callback/       # OAuth callback handler
+│   ├── login/
+│   │   └── page.tsx        # Login page with email/password & Google OAuth
+│   ├── globals.css         # Global styles & Tailwind config
+│   ├── layout.tsx          # Root layout with navbar & footer
+│   └── page.tsx            # Landing page
+├── lib/
+│   └── supabase/
+│       ├── client.ts       # Browser Supabase client
+│       ├── server.ts       # Server Supabase client
+│       └── middleware.ts   # Session refresh utilities
+├── middleware.ts           # Next.js middleware for auth
+└── .env.local.example      # Environment variables template
+```
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Node.js 18+
+- npm, yarn, pnpm, or bun
+- A [Supabase](https://supabase.com/) project
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/cognilink.git
+   cd cognilink
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-## Learn More
+3. Set up environment variables:
+   ```bash
+   cp .env.local.example .env.local
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+   Then edit `.env.local` with your Supabase credentials:
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your-project-url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. Configure Supabase:
+   - Enable Email/Password authentication in your Supabase dashboard
+   - (Optional) Enable Google OAuth provider
+   - Add `http://localhost:3000/auth/callback` to your allowed redirect URLs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+5. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
-## Deploy on Vercel
+6. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Build for production |
+| `npm run start` | Start production server |
+| `npm run lint` | Run ESLint |
+
+## Color Palette
+
+| Color | Hex | Usage |
+|-------|-----|-------|
+| Light Blue | `#8ecae6` | Accents, highlights |
+| Mid Blue | `#219ebc` | Primary buttons, CTAs |
+| Dark Navy | `#023047` | Background |
+
+## License
+
+MIT
+
