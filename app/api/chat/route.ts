@@ -1,129 +1,39 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, createUserContent, createPartFromUri } from '@google/genai';
 import { NextResponse } from 'next/server';
-import { z } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
-import { promises as fs } from 'fs';
-import path from 'path';
 
-const adjmatschema = z.object({
-  // List of topics / nodes inferred by the model
-  nodes: z.array(
-    z.object({
-      id: z.string(),           // unique identifier for the topic
-      label: z.string(),        // human-readable topic name
-      // you can add more fields here if you like, e.g. description: z.string().optional()
-    })
-  ).min(1),
-
-  // Adjacency matrix encoding links between topics.
-  // matrix[i][j] represents the link from nodes[i] -> nodes[j].
-  adjacencyMatrix: z
-    .array(z.array(z.number())) // 0/1 or weight; you can restrict to z.literal(0).or(z.literal(1)) if you want binary
-    .superRefine((matrix, ctx) => {
-      // Ensure the matrix is square and its size matches the number of nodes.
-      // We need access to `nodes`, so we do this check at the object level below.
-    }),
-})
-.superRefine((data, ctx) => {
-  const { nodes, adjacencyMatrix } = data;
-
-  const n = nodes.length;
-
-  if (adjacencyMatrix.length !== n) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: `adjacencyMatrix must have ${n} rows to match nodes.length`,
-      path: ['adjacencyMatrix'],
-    });
-    return;
-  }
-
-  adjacencyMatrix.forEach((row, i) => {
-    if (row.length !== n) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `Row ${i} of adjacencyMatrix must have length ${n}`,
-        path: ['adjacencyMatrix', i],
-      });
+const ADJ_MATRIX_SCHEMA = {
+  type: "object",
+  properties: {
+    n: {
+      type: "integer",
+      description: "Number of topics"
+    },
+    labels: {
+      type: "array",
+      items: { type: "string" },
+      description: "1xN array of topic names"
+    },
+    adjacencyMatrix: {
+      type: "array",
+      items: {
+        type: "array",
+        items: { type: "integer" }
+      },
+      description: "NxN adjacency matrix. adjacencyMatrix[i][j] = 1 means topic i is a prerequisite for topic j."
     }
-  });
-});
+  },
+  required: ["n", "labels", "adjacencyMatrix"]
+};
 
-export async function POST(req: Request) {
-  try {
-    const { prompt } = await req.json();
-
-    if (!prompt) {
-      return NextResponse.json(
-        { error: 'Prompt is required' },
-        { status: 400 }
-      );
-    }
-
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-    
-    // 1) Read multiple local files (demo-only)
-    // You can list as many files as you want here
-    const filePaths = [
-      // "/Users/isaacsze/Desktop/HackLDN 2026/cognilink/resource/test.txt",
-    ];
-
-<<<<<<< HEAD
-    const fileParts: { fileData: { fileUri: string; mimeType: string } }[] = [];
-
-    for (const filePath of filePaths) {
-      try {
-        const fileBuffer = await fs.readFile(filePath);
-        // Basic MIME type mapping - expand if needed for PDFs, images, etc.
-        const ext = path.extname(filePath).toLowerCase();
-        let mimeType = 'text/plain'; 
-        if (ext === '.pdf') mimeType = 'application/pdf';
-        else if (ext === '.png') mimeType = 'image/png';
-        else if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
-
-        const uploadResponse = await ai.files.upload({
-          file: {
-            data: fileBuffer,
-            mimeType,
-          },
-          config: {
-            displayName: path.basename(filePath),
-            mimeType,
-          }
-=======
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: {
-                systemInstruction: `You are an expert AI assistant inside the 'CogniLink' document analysis platform.
-                Your goals:
-                1. Help the user understand their documents and answer their questions clearly.
-                2. If a user asks about inappropriate, offensive, or harmful topics, politely refuse to answer.
-                3. Keep responses highly professional, concise, and focused on academics or knowledge.`,
-            }
->>>>>>> origin/main
-        });
-
-        fileParts.push({
-          fileData: {
-            fileUri: uploadResponse.file.uri,
-            mimeType: uploadResponse.file.mimeType,
-          },
-        });
-      } catch (err) {
-        console.warn(`Failed to process file ${filePath}:`, err);
-        // Continue with other files if one fails
-      }
-    }
-
-    // 2) The system prompt
-    const systemPrompt = `
+const SYSTEM_PROMPT = `
 Key role of the agent: An Agent that helps to organise the students' learning materials into graphs (outputted as an adjacency matrix).
 Key instructions: You are given the syllabus and learning materials of a student's course. Try to extract the key topics that the student could learn, and how one topic leads to another (represent them as an arrow), and what topics between the lectures are related (represent them as a double arrow).
 
-Output strictly in the following format:
-n by n integer adjacency matrix between the topics
-a 1xn string array which lists the labels (i.e. the topic name)
+Output strictly in the following format, following the json schema:
+int n: the number of topics in the syllabus
+array label: a 1xn string array which lists the labels (i.e. the topic name)
+adjacencymatrix: n by n integer adjacency matrix between the topics
+
 
 For example,
 A document mentions 4 key topics, A, B, C, D. A is pre-requisite of B, and B is pre-requisite to C and D. A and D are related in terms of application.
@@ -131,42 +41,77 @@ A document mentions 4 key topics, A, B, C, D. A is pre-requisite of B, and B is 
 Example output:
 Label: [A, B, C, D]
 Adjacency matrix:
-[[0, 1, 0, 1],[0,0,1,1],[0,0,0,0],[1,0,0,0]]
+[[0,1,0,1],[0,0,1,1],[0,0,0,0],[1,0,0,0]]
 
 Explanation:
 A and D points to each other, meaning that it is doubling connected (i.e. related)
 A is singly connected to B, so it is a pre-requisite of B
 `;
 
-    // 3) Call Gemini with prompt + all uploaded files
+export async function POST(req: Request) {
+  try {
+    const formData = await req.formData();
+    const prompt = formData.get('prompt') as string;
+    const files = formData.getAll('files') as File[];
+
+    if (!prompt) {
+      return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
+    }
+
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+
+    // Upload all files to Gemini Files API and collect their URIs
+    const uploadedFileParts = await Promise.all(
+      files.map(async (file) => {
+        const arrayBuffer = await file.arrayBuffer();
+        const blob = new Blob([arrayBuffer], { type: file.type });
+
+        const uploaded = await ai.files.upload({
+          file: blob,
+          config: { mimeType: file.type, displayName: file.name },
+        });
+
+        if (!uploaded.uri || !uploaded.mimeType) {
+          throw new Error(`Failed to upload file: ${file.name}`);
+        }
+
+        return createPartFromUri(uploaded.uri, uploaded.mimeType);
+      })
+    );
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: systemPrompt + "\n\n" + prompt },
-            ...fileParts
-          ],
-        },
-      ],
+      contents: createUserContent([
+        { text: SYSTEM_PROMPT },
+        { text: prompt },
+        ...uploadedFileParts,  // Attach uploaded files here
+      ]),
       config: {
         responseMimeType: 'application/json',
-        responseSchema: zodToJsonSchema(adjmatschema),
+        responseSchema: ADJ_MATRIX_SCHEMA,
       },
     });
 
-    console.log(response)
+    const raw = response.text;
+    if (!raw) {
+      return NextResponse.json({ error: 'Empty response from Gemini' }, { status: 500 });
+    }
 
-    // You may want to log/inspect what shape Gemini returns once:
-    // console.log(JSON.stringify(response, null, 2));
+    // Parse and do a basic sanity check before returning
+    const parsed = JSON.parse(raw);
+    if (
+      parsed.labels.length !== parsed.n ||
+      parsed.adjacencyMatrix.length !== parsed.n ||
+      parsed.adjacencyMatrix.some((row: number[]) => row.length !== parsed.n)
+    ) {
+      console.error('Gemini returned malformed matrix:', parsed);
+      return NextResponse.json({ error: 'Malformed graph from model' }, { status: 500 });
+    }
 
-    return NextResponse.json({ text: response.text });
+    return NextResponse.json(parsed);
+
   } catch (error) {
     console.error('Gemini API Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate response' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to generate response' }, { status: 500 });
   }
 }
