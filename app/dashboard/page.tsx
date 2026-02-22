@@ -402,60 +402,19 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-[#023047] text-white overflow-hidden" style={{ fontFamily: "'Ubuntu Mono', monospace" }}>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #219ebc; border-radius: 10px; }
-        @keyframes scan {
-          0%   { width: 0%;  margin-left: 0%; }
-          50%  { width: 60%; margin-left: 20%; }
-          100% { width: 0%;  margin-left: 100%; }
-        }
-        .scan-bar { animation: scan 1.5s ease-in-out infinite; }
-      ` }} />
-
-      {/* ── Full-screen upload loading overlay ───────────────────────────── */}
-      {isUploading && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#023047]/95 backdrop-blur-md">
-          {/* Pulsing rings */}
-          <div className="relative flex items-center justify-center mb-10">
-            <div className="absolute w-44 h-44 rounded-full border border-[#219ebc]/15 animate-ping" style={{ animationDuration: '2s' }} />
-            <div className="absolute w-36 h-36 rounded-full border border-[#219ebc]/25 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.35s' }} />
-            <div className="absolute w-28 h-28 rounded-full border border-[#219ebc]/35 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.7s' }} />
-            <div className="w-20 h-20 rounded-full bg-[#219ebc]/10 border border-[#219ebc]/50 flex items-center justify-center">
-              <Loader2 className="w-9 h-9 text-[#8ecae6] animate-spin" />
-            </div>
-          </div>
-
-          <h2 className="text-2xl font-bold uppercase tracking-[0.3em] text-white mb-3">
-            Processing Document
-          </h2>
-          <p className="text-sm text-[#8ecae6] font-bold max-w-xs text-center tracking-wide opacity-80">
-            {uploadStatus}
-          </p>
-
-          {/* Scanning progress bar */}
-          <div className="mt-8 w-64 h-0.5 bg-white/10 rounded-full overflow-hidden">
-            <div className="scan-bar h-full bg-[#219ebc] rounded-full" />
-          </div>
-        </div>
-      )}
-
-      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-      <aside className="w-80 border-r border-white/5 bg-white/[0.02] flex flex-col">
+    <div className="flex h-screen bg-[#023047] text-white overflow-hidden animate-fade-in" style={{ fontFamily: "'Ubuntu Mono', monospace" }}>
+      {/* Sidebar with slide-in animation */}
+      <aside className="w-80 border-r border-white/5 bg-white/[0.02] flex flex-col animate-slide-in" style={{ animationDelay: '0.1s' }}>
         <div className="p-6 border-b border-white/5">
           <input ref={sidebarInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
           <button
             onClick={() => !isUploading && sidebarInputRef.current?.click()}
             disabled={isUploading}
-            className="w-full bg-[#219ebc] hover:bg-[#8ecae6] hover:text-[#023047] py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#219ebc]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#219ebc] hover:bg-[#8ecae6] hover:text-[#023047] py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#219ebc]/10 disabled:opacity-50 disabled:cursor-not-allowed animate-bounce-short"
           >
             <Plus className="w-4 h-4" /> NEW DOCUMENT
           </button>
         </div>
-
         <nav className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-1">
           <div className="px-2 mb-4">
             <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Core Library</span>
@@ -466,7 +425,7 @@ export default function DashboardPage() {
             <button
               key={doc.id}
               onClick={() => setActiveDoc(doc)}
-              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${activeDoc?.id === doc.id ? 'bg-[#219ebc]/20 border-[#219ebc]/40 text-[#8ecae6]' : 'hover:bg-white/5 border-transparent text-gray-400 hover:text-white'}`}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${activeDoc?.id === doc.id ? 'bg-[#219ebc]/20 border-[#219ebc]/40 text-[#8ecae6] animate-pop' : 'hover:bg-white/5 border-transparent text-gray-400 hover:text-white animate-hover-pop'}`}
             >
               <FileText className="w-4 h-4 flex-shrink-0" />
               <div className="flex-1 text-left truncate">
@@ -476,7 +435,6 @@ export default function DashboardPage() {
               {activeDoc?.id === doc.id && <div className="w-1.5 h-1.5 rounded-full bg-[#8ecae6]" />}
             </button>
           ))}
-
         </nav>
 
         <div className="p-4 border-t border-white/5 bg-black/20">
