@@ -116,7 +116,7 @@ export default function RootLayout({
             </div>
 
             <div className="max-w-6xl mx-auto mt-20 pt-8 border-t border-white/5 text-center text-gray-600 text-[10px] font-bold tracking-widest">
-              © 2024 COGNILINK_AI_TECHNOLOGIES. ALL_RIGHTS_RESERVED.
+              © 2026 Cognilink. This is protected under MIT license.
             </div>
           </footer>
         )}
