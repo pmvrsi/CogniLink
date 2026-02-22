@@ -25,6 +25,7 @@ export interface ForceGraphData {
 
 interface NoSSRForceGraphProps {
   graphData: ForceGraphData;
+  onNodeClick?: (nodeId: number) => void;
 }
 
 /**
@@ -50,7 +51,7 @@ export function adjacencyMatrixToGraphData(
   return { nodes, links };
 }
 
-export default function NoSSRForceGraph({ graphData }: NoSSRForceGraphProps) {
+export default function NoSSRForceGraph({ graphData, onNodeClick }: NoSSRForceGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 800, height: 600 });
 
@@ -113,6 +114,7 @@ export default function NoSSRForceGraph({ graphData }: NoSSRForceGraphProps) {
         linkDirectionalArrowRelPos={1}
         nodeCanvasObject={nodeCanvasObject}
         nodeCanvasObjectMode={() => 'replace'}
+        onNodeClick={(node: any) => onNodeClick?.(node.id as number)}
       />
     </div>
   );

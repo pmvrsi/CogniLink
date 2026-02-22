@@ -13,6 +13,11 @@ const ADJ_MATRIX_SCHEMA = {
       items: { type: "string" },
       description: "Array of n topic names. Length must equal n."
     },
+    label_summary: {
+      type: "array",
+      items: { type: "string" },
+      description: "Array of n short summaries. label_summary[i] is a 1-2 sentence summary of the topic in labels[i]. Length must equal n."
+    },
     adjacencyMatrix: {
       type: "array",
       items: {
@@ -24,7 +29,7 @@ const ADJ_MATRIX_SCHEMA = {
       description: "nxn matrix of 0s and 1s. adjacencyMatrix[i][j]=1 means topic i is a prerequisite for topic j. No bidirectional entries (i.e. if [i][j]=1 then [j][i] must be 0)."
     }
   },
-  required: ["n", "labels", "adjacencyMatrix"]
+  required: ["n", "labels", "label_summary", "adjacencyMatrix"]
 };
 
 const SYSTEM_PROMPT = `
@@ -45,6 +50,7 @@ Output:
 {
   "n": 4,
   "labels": ["A", "B", "C", "D"],
+  "label_summary": ["Summary of topic A.", "Summary of topic B.", "Summary of topic C.", "Summary of topic D."],
   "adjacencyMatrix": [[0,1,0,0],[0,0,1,1],[0,0,0,0],[0,0,0,0]]
 }
 
@@ -107,6 +113,7 @@ export async function POST(req: Request) {
     const parsed = JSON.parse(raw);
     if (
       parsed.labels.length !== parsed.n ||
+      parsed.label_summary.length !== parsed.n ||
       parsed.adjacencyMatrix.length !== parsed.n ||
       parsed.adjacencyMatrix.some((row: number[]) => row.length !== parsed.n)
     ) {

@@ -32,6 +32,7 @@ interface Message {
 interface GraphData {
   n: number;
   labels: string[];
+  label_summary: string[];
   adjacencyMatrix: number[][];
 }
 
@@ -57,6 +58,7 @@ export default function DashboardPage() {
   const [graphData, setGraphData]               = useState<GraphData | null>(null);
   const [graphPrompt, setGraphPrompt]           = useState('');
   const [isGeneratingGraph, setIsGeneratingGraph] = useState(false);
+  const [selectedNodeIndex, setSelectedNodeIndex] = useState<number | null>(null);
 
   const [documents, setDocuments] = useState<Doc[]>([
     { id: 1, name: 'Quantum_Physics_Ch4.pdf',     size: '12.4 MB', date: '2024-03-15', status: 'Analysed' },
@@ -114,6 +116,7 @@ export default function DashboardPage() {
       if (res.ok && data.n && data.labels && data.adjacencyMatrix) {
         setDocuments(prev => prev.map(d => d.id === newDoc.id ? { ...d, status: 'Analysed' } : d));
         setGraphData(data);
+        setSelectedNodeIndex(null);
         setMessages([{
           role: 'ai',
           content: `Analysed "${file.name}". Extracted ${data.n} topics: ${data.labels.join(', ')}. Knowledge graph is live in the right panel.`,
@@ -155,6 +158,7 @@ export default function DashboardPage() {
 
       if (res.ok && data.n && data.labels && data.adjacencyMatrix) {
         setGraphData(data);
+        setSelectedNodeIndex(null);
         setGraphPrompt('');
         setMessages(prev => [...prev, {
           role: 'ai',
@@ -188,6 +192,7 @@ export default function DashboardPage() {
 
       if (res.ok && data.n && data.labels && data.adjacencyMatrix) {
         setGraphData(data);
+        setSelectedNodeIndex(null);
         setMessages(prev => [...prev, {
           role: 'ai',
           content: `Graph updated — ${data.n} topics extracted: ${data.labels.join(', ')}.`,
@@ -354,7 +359,7 @@ export default function DashboardPage() {
             {/* ForceGraph fills the entire remaining area */}
             <div className="flex-1 relative min-h-0 overflow-hidden">
               <div className="absolute inset-0">
-                {forceGraph && <NoSSRForceGraph graphData={forceGraph} />}
+                {forceGraph && <NoSSRForceGraph graphData={forceGraph} onNodeClick={(id) => setSelectedNodeIndex(id)} />}
               </div>
               {isGeneratingGraph && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
@@ -369,6 +374,27 @@ export default function DashboardPage() {
 
           {/* Chat — collapsed to right panel */}
           <aside className="w-96 border-l border-white/5 bg-white/[0.01] flex flex-col">
+            {/* Topic summary panel — shown when a node is clicked */}
+            {selectedNodeIndex !== null && graphData && (
+              <div className="p-5 border-b border-white/5 shrink-0">
+                <div className="flex items-center justify-between mb-3">
+                  <h5 className="text-[10px] font-bold text-[#8ecae6] uppercase tracking-[0.4em]">Topic Detail</h5>
+                  <button
+                    onClick={() => setSelectedNodeIndex(null)}
+                    className="text-[10px] font-bold text-white/30 hover:text-white uppercase tracking-wider"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="bg-[#219ebc]/10 border border-[#219ebc]/30 rounded-xl p-4">
+                  <h6 className="text-sm font-bold text-white mb-2">{graphData.labels[selectedNodeIndex]}</h6>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    {graphData.label_summary?.[selectedNodeIndex] ?? 'No summary available.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="p-5 border-b border-white/5 shrink-0">
               <h5 className="text-[10px] font-bold text-white/30 uppercase tracking-[0.4em] mb-4">Chat</h5>
 
