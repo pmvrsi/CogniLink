@@ -3,6 +3,11 @@ import { updateSession } from '@/lib/supabase/middleware';
 import { createServerClient } from '@supabase/ssr';
 
 export async function middleware(request: NextRequest) {
+  // DEV BYPASS: skip all auth redirects in development
+  if (process.env.NODE_ENV === 'development') {
+    return NextResponse.next();
+  }
+
   // First, update the session
   const response = await updateSession(request);
 
