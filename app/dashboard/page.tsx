@@ -363,24 +363,23 @@ export default function DashboardPage() {
     setMessages(prev => [...prev, { role: 'user', content: query }]);
     setQuery('');
 
-    const formData = new FormData();
-    formData.append('prompt', query);
-    if (activeFile) formData.append('files', activeFile);
-
     try {
-      const res  = await fetch('/api/chat', { method: 'POST', body: formData });
-      const data = await res.json() as GraphData;
+      const res  = await fetch('/api/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: query,
+          labels:          graphData?.labels,
+          label_summary:   graphData?.label_summary,
+          adjacencyMatrix: graphData?.adjacencyMatrix,
+        }),
+      });
+      const data = await res.json() as { answer?: string; error?: string };
 
-      if (res.ok && data.n && data.labels && data.adjacencyMatrix) {
-        setGraphData(data);
-        setSelectedNodeIndex(null);
-        setMessages(prev => [...prev, {
-          role: 'ai',
-          content: `Graph updated — ${data.n} topics extracted: ${data.labels.join(', ')}.`,
-        }]);
-      } else {
-        setMessages(prev => [...prev, { role: 'ai', content: 'Could not process that request.' }]);
-      }
+      setMessages(prev => [...prev, {
+        role: 'ai',
+        content: res.ok && data.answer ? data.answer : 'Could not process that request.',
+      }]);
     } catch {
       setMessages(prev => [...prev, { role: 'ai', content: 'Server error.' }]);
     } finally {
@@ -465,7 +464,7 @@ export default function DashboardPage() {
         </div>
         <nav className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-1">
           <div className="px-2 mb-4">
-            <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Core Library</span>
+            <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Library</span>
           </div>
           {/* Streak Widget */}
           <StreakWidget userId={user?.id ?? null} />
