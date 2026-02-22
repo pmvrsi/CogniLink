@@ -4,16 +4,17 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import NoSSRForceGraph, { adjacencyMatrixToGraphData, type ForceGraphData } from '@/lib/NoSSRForceGraph';
-import { Brain, Loader2 } from 'lucide-react';
+import { Brain, Loader2, User } from 'lucide-react';
 
 interface GraphData {
   n: number;
   labels: string[];
   label_summary: string[];
   adjacencyMatrix: number[][];
+  shared_by?: string;
 }
 
-export default function SharePage() {
+export default function PublicGraphPage() {
   const { id } = useParams<{ id: string }>();
   const [graphData, setGraphData]   = useState<GraphData | null>(null);
   const [forceGraph, setForceGraph] = useState<ForceGraphData | null>(null);
@@ -53,7 +54,7 @@ export default function SharePage() {
     );
   }
 
-  const selectedTopic = selected !== null ? graphData.labels[selected] : null;
+  const selectedTopic   = selected !== null ? graphData.labels[selected]       : null;
   const selectedSummary = selected !== null ? graphData.label_summary[selected] : null;
 
   return (
@@ -62,7 +63,13 @@ export default function SharePage() {
       <header className="border-b border-white/5 px-6 py-4 flex items-center gap-3">
         <Brain className="w-5 h-5 text-[#219ebc]" />
         <span className="font-bold text-sm tracking-wide">CogniLink</span>
-        <span className="text-white/20 text-xs ml-2">Shared Graph</span>
+        <span className="text-white/10 mx-1">·</span>
+        {graphData.shared_by && (
+          <div className="flex items-center gap-1.5 text-xs text-white/40">
+            <User className="w-3 h-3" />
+            <span>Shared by <span className="text-white/70 font-semibold">{graphData.shared_by}</span></span>
+          </div>
+        )}
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -77,7 +84,8 @@ export default function SharePage() {
         {/* Sidebar */}
         <aside className="w-72 border-l border-white/5 bg-white/[0.01] flex flex-col overflow-y-auto p-5 gap-4">
           <div>
-            <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-3">Topics</p>
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1">Knowledge Graph</p>
+            <p className="text-[10px] text-white/20 mb-3">{graphData.n} topics</p>
             <div className="space-y-1">
               {graphData.labels.map((label, i) => (
                 <button

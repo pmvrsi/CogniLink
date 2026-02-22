@@ -363,15 +363,24 @@ export default function DashboardPage() {
     if (!graphData) return;
     setIsSharing(true);
     try {
+      const username =
+        user?.user_metadata?.full_name  ||
+        user?.user_metadata?.name       ||
+        user?.email?.split('@')[0]      ||
+        'Anonymous';
+
       const { data, error } = await supabase
         .from('shared_graphs')
-        .insert({ user_id: user?.id, graph_data: graphData })
+        .insert({
+          user_id:    user?.id,
+          graph_data: { ...graphData, shared_by: username },
+        })
         .select('id')
         .single();
 
       if (error || !data) throw error;
 
-      const url = `${window.location.origin}/share/${data.id}`;
+      const url = `https://cognilink.vercel.app/publicgraph/${data.id}`;
       await navigator.clipboard.writeText(url);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 2500);
