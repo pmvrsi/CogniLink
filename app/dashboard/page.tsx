@@ -230,7 +230,7 @@ export default function DashboardPage() {
   // File upload
   const sidebarInputRef  = useRef<HTMLInputElement>(null);
   const dropzoneInputRef = useRef<HTMLInputElement>(null);
-  const [activeFile, setActiveFile]     = useState<File | null>(null);
+  const [activeFiles, setActiveFiles]   = useState<File[]>([]);
   const [isUploading, setIsUploading]   = useState(false);
   const [uploadStatus, setUploadStatus] = useState('');
 
@@ -269,47 +269,48 @@ export default function DashboardPage() {
 
   // ── Upload a PDF → Gemini → get GraphData back ────────────────────────────
 
-  const processFile = async (file: File) => {
-    setActiveFile(file);
+  const processFiles = async (files: File[]) => {
+    if (!files.length) return;
+    setActiveFiles(files);
     setIsUploading(true);
-    setUploadStatus(`Uploading ${file.name} to Gemini…`);
+    setUploadStatus(`Uploading ${files.length} file(s) to Gemini…`);
 
-    const newDoc: Doc = {
-      id:     Date.now(),
+    const newDocs: Doc[] = files.map((file, i) => ({
+      id:     Date.now() + i,
       name:   file.name,
       size:   `${(file.size / 1024 / 1024).toFixed(1)} MB`,
       date:   new Date().toISOString().split('T')[0],
       status: 'Uploading…',
-    };
-    setDocuments(prev => [newDoc, ...prev]);
-    setActiveDoc(newDoc);
+    }));
+    setDocuments(prev => [...newDocs, ...prev]);
+    setActiveDoc(newDocs[0]);
 
     const formData = new FormData();
     formData.append(
       'prompt',
-      'Extract all key topics from this document and map their prerequisite relationships as a directed graph.'
+      'Extract all key topics from these documents and map their prerequisite relationships as a directed graph.'
     );
-    formData.append('files', file);
+    files.forEach(file => formData.append('files', file));
 
     try {
-      setUploadStatus('Analysing document, Extracting topics and relationships');
+      setUploadStatus('Analysing documents, Extracting topics and relationships');
       const res  = await fetch('/api/chat', { method: 'POST', body: formData });
       const data = await res.json() as GraphData;
 
       if (res.ok && data.n && data.labels && data.adjacencyMatrix) {
-        setDocuments(prev => prev.map(d => d.id === newDoc.id ? { ...d, status: 'Analysed' } : d));
+        setDocuments(prev => prev.map(d => newDocs.some(nd => nd.id === d.id) ? { ...d, status: 'Analysed' } : d));
         setGraphData(data);
         setSelectedNodeIndex(null);
         setMessages([{
           role: 'ai',
-          content: `Analysed "${file.name}". Extracted ${data.n} topics: ${data.labels.join(', ')}. Knowledge graph is live in the left panel.`,
+          content: `Analysed ${files.length} file(s). Extracted ${data.n} topics: ${data.labels.join(', ')}. Knowledge graph is live in the left panel.`,
         }]);
       } else {
-        setDocuments(prev => prev.map(d => d.id === newDoc.id ? { ...d, status: 'Failed' } : d));
+        setDocuments(prev => prev.map(d => newDocs.some(nd => nd.id === d.id) ? { ...d, status: 'Failed' } : d));
         setMessages([{ role: 'ai', content: `Error: ${JSON.stringify(data)}` }]);
       }
     } catch {
-      setDocuments(prev => prev.map(d => d.id === newDoc.id ? { ...d, status: 'Failed' } : d));
+      setDocuments(prev => prev.map(d => newDocs.some(nd => nd.id === d.id) ? { ...d, status: 'Failed' } : d));
       setMessages([{ role: 'ai', content: 'Could not reach the server.' }]);
     } finally {
       setIsUploading(false);
@@ -318,8 +319,8 @@ export default function DashboardPage() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) processFile(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length) processFiles(files);
     // Reset value so the same file can be re-selected
     e.target.value = '';
   };
@@ -333,7 +334,7 @@ export default function DashboardPage() {
 
     const formData = new FormData();
     formData.append('prompt', graphPrompt);
-    if (activeFile) formData.append('files', activeFile);
+    activeFiles.forEach(file => formData.append('files', file));
 
     try {
       const res  = await fetch('/api/chat', { method: 'POST', body: formData });
@@ -525,7 +526,7 @@ export default function DashboardPage() {
       {/* Sidebar with slide-in animation */}
       <aside className="w-80 border-r border-white/5 bg-white/[0.02] flex flex-col animate-slide-in" style={{ animationDelay: '0.1s' }}>
         <div className="p-6 border-b border-white/5">
-          <input ref={sidebarInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
+          <input ref={sidebarInputRef} type="file" multiple accept="application/pdf" className="hidden" onChange={handleFileChange} />
           <button
             onClick={() => !isUploading && sidebarInputRef.current?.click()}
             disabled={isUploading}
@@ -683,10 +684,10 @@ export default function DashboardPage() {
               <h5 className="text-[10px] font-bold text-white/30 uppercase tracking-[0.4em] mb-4">Chat</h5>
 
               {/* Re-generate prompt */}
-              {activeFile && (
+              {activeFiles.length > 0 && (
                 <div className="mb-2 flex items-center gap-1.5 text-[10px] text-[#8ecae6]/70 font-bold uppercase tracking-wider">
                   <FileText className="w-3 h-3 flex-shrink-0" />
-                  <span className="truncate">{activeFile.name}</span>
+                  <span className="truncate">{activeFiles.map(f => f.name).join(', ')}</span>
                 </div>
               )}
               <textarea
@@ -861,11 +862,11 @@ export default function DashboardPage() {
                   onDrop={e => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const file = e.dataTransfer.files?.[0];
-                    if (file && !isUploading) processFile(file);
+                    const files = Array.from(e.dataTransfer.files || []);
+                    if (files.length && !isUploading) processFiles(files);
                   }}
                 >
-                  <input ref={dropzoneInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
+                  <input ref={dropzoneInputRef} type="file" multiple accept="application/pdf" className="hidden" onChange={handleFileChange} />
                   <button
                     type="button"
                     onClick={() => {
@@ -910,16 +911,16 @@ export default function DashboardPage() {
               </div>
               {/* Prompt box */}
               <div className="shrink-0">
-                {activeFile && (
+                {activeFiles.length > 0 && (
                   <div className="mb-2 flex items-center gap-1.5 text-[10px] text-[#8ecae6]/70 font-bold uppercase tracking-wider">
                     <FileText className="w-3 h-3 flex-shrink-0" />
-                    <span className="truncate">{activeFile.name}</span>
+                    <span className="truncate">{activeFiles.map(f => f.name).join(', ')}</span>
                   </div>
                 )}
                 <textarea
                   value={graphPrompt}
                   onChange={e => setGraphPrompt(e.target.value)}
-                  placeholder={activeFile ? `Ask about ${activeFile.name}…` : 'Enter a topic prompt for the graph…'}
+                  placeholder={activeFiles.length > 0 ? `Ask about ${activeFiles.length} file(s)…` : 'Enter a topic prompt for the graph…'}
                   className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm outline-none placeholder:text-gray-600 font-bold resize-none h-20 focus:border-[#219ebc]/50 transition-all"
                 />
                 <button
