@@ -92,7 +92,15 @@ function StreakWidget({ userId }: { userId: string | null }) {
         setLoading(false);
         return;
       }
-      const loginDates = logins?.map((l) => l.login_date) || [];
+      const loginDates = (logins || []).map((l: any) => {
+        const d = l.login_date;
+        if (!d) return null;
+        try {
+          return new Date(d).toISOString().split('T')[0];
+        } catch (e) {
+          return null;
+        }
+      }).filter(Boolean) as string[];
       let currentStreak = 0;
       let checkDate = new Date();
       for (let i = 0; i < 365; i++) {

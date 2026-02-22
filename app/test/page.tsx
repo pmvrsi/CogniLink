@@ -71,7 +71,15 @@ function StreakWidget({ userId }: { userId: string | null }) {
         return;
       }
 
-      const loginDates = logins?.map((l) => l.login_date) || [];
+      const loginDates = (logins || []).map((l: any) => {
+        const d = l.login_date;
+        if (!d) return null;
+        try {
+          return new Date(d).toISOString().split('T')[0];
+        } catch (e) {
+          return null;
+        }
+      }).filter(Boolean) as string[];
 
       // Calculate current streak
       let currentStreak = 0;
