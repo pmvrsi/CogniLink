@@ -56,9 +56,6 @@ export default function RootLayout({
                   <Link href="/login" className="text-sm font-bold text-gray-300 hover:text-white hidden sm:block">
                     Log in
                   </Link>
-                  <Link href="/signup" className="bg-white text-[#023047] px-6 py-2 rounded-full text-sm font-bold hover:bg-[#8ecae6] transition-all transform active:scale-95 shadow-lg">
-                    Get started
-                  </Link>
                 </div>
               </div>
             </div>
