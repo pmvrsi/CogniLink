@@ -8,7 +8,7 @@ import { User } from '@supabase/supabase-js';
 import {
   FileText, Mic, Brain, Search, Plus, Upload,
   Settings, LogOut, ChevronRight, Terminal, Sparkles,
-  Command, History, MoreVertical, Loader2
+  Command, History, MoreVertical, Loader2, Share2, Check
 } from 'lucide-react';
 import Link from 'next/link';
 import NoSSRForceGraph, { adjacencyMatrixToGraphData, type ForceGraphData } from '@/lib/NoSSRForceGraph';
@@ -244,6 +244,8 @@ export default function DashboardPage() {
   const [graphPrompt, setGraphPrompt]           = useState('');
   const [isGeneratingGraph, setIsGeneratingGraph] = useState(false);
   const [selectedNodeIndex, setSelectedNodeIndex] = useState<number | null>(null);
+  const [isSharing, setIsSharing]                 = useState(false);
+  const [shareCopied, setShareCopied]             = useState(false);
 
   const [documents, setDocuments] = useState<Doc[]>([]);
 
@@ -352,6 +354,31 @@ export default function DashboardPage() {
       console.error('Graph generation error:', err);
     } finally {
       setIsGeneratingGraph(false);
+    }
+  };
+
+  // ── Share graph ───────────────────────────────────────────────────────────
+
+  const handleShare = async () => {
+    if (!graphData) return;
+    setIsSharing(true);
+    try {
+      const { data, error } = await supabase
+        .from('shared_graphs')
+        .insert({ user_id: user?.id, graph_data: graphData })
+        .select('id')
+        .single();
+
+      if (error || !data) throw error;
+
+      const url = `${window.location.origin}/share/${data.id}`;
+      await navigator.clipboard.writeText(url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2500);
+    } catch (err) {
+      console.error('Share error:', err);
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -597,6 +624,18 @@ export default function DashboardPage() {
                 {isGeneratingGraph
                   ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating…</>
                   : 'Regenerate Graph'
+                }
+              </button>
+              <button
+                onClick={handleShare}
+                disabled={!graphData || isSharing}
+                className="w-full mt-2 bg-white/5 hover:bg-white/10 border border-white/10 py-2 rounded-xl font-bold text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {isSharing
+                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Saving…</>
+                  : shareCopied
+                  ? <><Check className="w-3 h-3 text-green-400" /> <span className="text-green-400">Link Copied!</span></>
+                  : <><Share2 className="w-3 h-3" /> Share Graph</>
                 }
               </button>
             </div>
