@@ -1,38 +1,81 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
-import { 
-  Link as LinkIcon, 
-  LogOut, 
-  FileText, 
-  Plus,
-  Search,
-  Mic,
-  Settings,
-  Loader2
+import {
+  FileText, Mic, Brain, Search, Plus, Upload,
+  Settings, LogOut, ChevronRight, Terminal, Sparkles,
+  Command, History, MoreVertical, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
+import NoSSRForceGraph, { adjacencyMatrixToGraphData, type ForceGraphData } from '@/lib/NoSSRForceGraph';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Doc {
+  id: number;
+  name: string;
+  size: string;
+  date: string;
+  status: string;
+}
+
+interface Message {
+  role: 'user' | 'ai';
+  content: string;
+}
+
+// Shape returned by /api/chat (Gemini schema)
+interface GraphData {
+  n: number;
+  labels: string[];
+  label_summary: string[];
+  adjacencyMatrix: number[][];
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+  const [user, setUser]           = useState<User | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [activeDoc, setActiveDoc] = useState<Doc | null>(null);
+  const [messages, setMessages]   = useState<Message[]>([]);
+  const [query, setQuery]         = useState('');
+  const [isScanning, setIsScanning]   = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  // File upload
+  const sidebarInputRef  = useRef<HTMLInputElement>(null);
+  const dropzoneInputRef = useRef<HTMLInputElement>(null);
+  const [activeFile, setActiveFile]     = useState<File | null>(null);
+  const [isUploading, setIsUploading]   = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+
+  // Graph
+  const [graphData, setGraphData]               = useState<GraphData | null>(null);
+  const [graphPrompt, setGraphPrompt]           = useState('');
+  const [isGeneratingGraph, setIsGeneratingGraph] = useState(false);
+  const [selectedNodeIndex, setSelectedNodeIndex] = useState<number | null>(null);
+
+  const [documents, setDocuments] = useState<Doc[]>([
+    { id: 1, name: 'Quantum_Physics_Ch4.pdf',     size: '12.4 MB', date: '2024-03-15', status: 'Analysed' },
+    { id: 2, name: 'Molecular_Biology_Final.pdf', size: '8.1 MB',  date: '2024-03-14', status: 'Analysed' },
+    { id: 3, name: 'History_WW2_Economics.pdf',   size: '15.9 MB', date: '2024-03-10', status: 'Partial'  },
+  ]);
+
+  const router   = useRouter();
   const supabase = createClient();
 
+  // Auth check — no redirect in dev; middleware handles auth in production
   useEffect(() => {
-    const getUser = async () => {
+    (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-      } else {
-        setUser(user);
-      }
+      if (user) setUser(user);
       setLoading(false);
-    };
-    getUser();
+    })();
   }, [router, supabase.auth]);
 
   const handleLogout = async () => {
@@ -41,105 +84,568 @@ export default function DashboardPage() {
     router.refresh();
   };
 
+  // ── Upload a PDF → Gemini → get GraphData back ────────────────────────────
+
+  const processFile = async (file: File) => {
+    setActiveFile(file);
+    setIsUploading(true);
+    setUploadStatus(`Uploading ${file.name} to Gemini…`);
+
+    const newDoc: Doc = {
+      id:     Date.now(),
+      name:   file.name,
+      size:   `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+      date:   new Date().toISOString().split('T')[0],
+      status: 'Uploading…',
+    };
+    setDocuments(prev => [newDoc, ...prev]);
+    setActiveDoc(newDoc);
+
+    const formData = new FormData();
+    formData.append(
+      'prompt',
+      'Extract all key topics from this document and map their prerequisite relationships as a directed graph.'
+    );
+    formData.append('files', file);
+
+    try {
+      setUploadStatus('Analysing with Gemini — extracting topics and relationships…');
+      const res  = await fetch('/api/chat', { method: 'POST', body: formData });
+      const data = await res.json() as GraphData;
+
+      if (res.ok && data.n && data.labels && data.adjacencyMatrix) {
+        setDocuments(prev => prev.map(d => d.id === newDoc.id ? { ...d, status: 'Analysed' } : d));
+        setGraphData(data);
+        setSelectedNodeIndex(null);
+        setMessages([{
+          role: 'ai',
+          content: `Analysed "${file.name}". Extracted ${data.n} topics: ${data.labels.join(', ')}. Knowledge graph is live in the right panel.`,
+        }]);
+      } else {
+        setDocuments(prev => prev.map(d => d.id === newDoc.id ? { ...d, status: 'Failed' } : d));
+        setMessages([{ role: 'ai', content: `Error: ${JSON.stringify(data)}` }]);
+      }
+    } catch {
+      setDocuments(prev => prev.map(d => d.id === newDoc.id ? { ...d, status: 'Failed' } : d));
+      setMessages([{ role: 'ai', content: 'Could not reach the server.' }]);
+    } finally {
+      setIsUploading(false);
+      setUploadStatus('');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
+    // Reset value so the same file can be re-selected
+    e.target.value = '';
+  };
+
+  // ── Right-panel Generate Graph button ─────────────────────────────────────
+  // Sends the prompt (+ active file if present) to /api/chat and renders result
+
+  const handleGenerateGraph = async () => {
+    if (!graphPrompt.trim()) return;
+    setIsGeneratingGraph(true);
+
+    const formData = new FormData();
+    formData.append('prompt', graphPrompt);
+    if (activeFile) formData.append('files', activeFile);
+
+    try {
+      const res  = await fetch('/api/chat', { method: 'POST', body: formData });
+      const data = await res.json() as GraphData;
+
+      if (res.ok && data.n && data.labels && data.adjacencyMatrix) {
+        setGraphData(data);
+        setSelectedNodeIndex(null);
+        setGraphPrompt('');
+        setMessages(prev => [...prev, {
+          role: 'ai',
+          content: `Graph updated — ${data.n} topics: ${data.labels.join(', ')}.`,
+        }]);
+      } else {
+        console.error('Graph generation failed:', data);
+      }
+    } catch (err) {
+      console.error('Graph generation error:', err);
+    } finally {
+      setIsGeneratingGraph(false);
+    }
+  };
+
+  // ── Chat scan ─────────────────────────────────────────────────────────────
+
+  const handleScan = async () => {
+    if (!query.trim()) return;
+    setIsScanning(true);
+    setMessages(prev => [...prev, { role: 'user', content: query }]);
+    setQuery('');
+
+    const formData = new FormData();
+    formData.append('prompt', query);
+    if (activeFile) formData.append('files', activeFile);
+
+    try {
+      const res  = await fetch('/api/chat', { method: 'POST', body: formData });
+      const data = await res.json() as GraphData;
+
+      if (res.ok && data.n && data.labels && data.adjacencyMatrix) {
+        setGraphData(data);
+        setSelectedNodeIndex(null);
+        setMessages(prev => [...prev, {
+          role: 'ai',
+          content: `Graph updated — ${data.n} topics extracted: ${data.labels.join(', ')}.`,
+        }]);
+      } else {
+        setMessages(prev => [...prev, { role: 'ai', content: 'Could not process that request.' }]);
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: 'ai', content: 'Server error.' }]);
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const toggleVoice = () => setIsListening(v => !v);
+
+  // Convert GraphData → ForceGraph format for the renderer
+  const forceGraph: ForceGraphData | null = graphData
+    ? adjacencyMatrixToGraphData(graphData.n, graphData.labels, graphData.adjacencyMatrix)
+    : null;
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex h-screen items-center justify-center bg-[#023047]">
         <Loader2 className="w-8 h-8 animate-spin text-[#8ecae6]" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen">
-      {/* Dashboard Header */}
-      <header className="border-b border-white/10 bg-white/5 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#8ecae6] rounded-lg flex items-center justify-center">
-              <LinkIcon className="w-4 h-4 text-[#023047]" strokeWidth={3} />
+    <div className="flex h-screen bg-[#023047] text-white overflow-hidden" style={{ fontFamily: "'Ubuntu Mono', monospace" }}>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #219ebc; border-radius: 10px; }
+        @keyframes scan {
+          0%   { width: 0%;  margin-left: 0%; }
+          50%  { width: 60%; margin-left: 20%; }
+          100% { width: 0%;  margin-left: 100%; }
+        }
+        .scan-bar { animation: scan 1.5s ease-in-out infinite; }
+      ` }} />
+
+      {/* ── Full-screen upload loading overlay ───────────────────────────── */}
+      {isUploading && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#023047]/95 backdrop-blur-md">
+          {/* Pulsing rings */}
+          <div className="relative flex items-center justify-center mb-10">
+            <div className="absolute w-44 h-44 rounded-full border border-[#219ebc]/15 animate-ping" style={{ animationDuration: '2s' }} />
+            <div className="absolute w-36 h-36 rounded-full border border-[#219ebc]/25 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.35s' }} />
+            <div className="absolute w-28 h-28 rounded-full border border-[#219ebc]/35 animate-ping" style={{ animationDuration: '2s', animationDelay: '0.7s' }} />
+            <div className="w-20 h-20 rounded-full bg-[#219ebc]/10 border border-[#219ebc]/50 flex items-center justify-center">
+              <Loader2 className="w-9 h-9 text-[#8ecae6] animate-spin" />
             </div>
-            <span className="text-xl font-bold tracking-tight">CogniLink</span>
-          </Link>
-
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-400 hidden sm:block">
-              {user?.email}
-            </span>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 text-sm font-bold text-gray-400 hover:text-white transition-colors"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Sign out</span>
-            </button>
           </div>
-        </div>
-      </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        {/* Welcome Section */}
-        <div className="mb-12">
-          <h1 className="text-4xl font-bold mb-2 tracking-tight">
-            Welcome back{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name}` : ''}
-          </h1>
-          <p className="text-gray-400 text-lg">
-            [SYSTEM_READY]: Your knowledge base is active and learning.
+          <h2 className="text-2xl font-bold uppercase tracking-[0.3em] text-white mb-3">
+            Processing Document
+          </h2>
+          <p className="text-sm text-[#8ecae6] font-bold max-w-xs text-center tracking-wide opacity-80">
+            {uploadStatus}
           </p>
-        </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <button className="bg-[#219ebc] hover:bg-[#8ecae6] hover:text-[#023047] p-6 rounded-2xl transition-all group text-left">
-            <Plus className="w-8 h-8 mb-4" />
-            <h3 className="font-bold text-lg mb-1">Upload Document</h3>
-            <p className="text-sm opacity-80">Add PDFs, notes, or images</p>
-          </button>
-
-          <button className="bg-white/5 border border-white/10 hover:bg-white/10 p-6 rounded-2xl transition-all group text-left">
-            <Search className="w-8 h-8 mb-4 text-[#8ecae6]" />
-            <h3 className="font-bold text-lg mb-1">Search Knowledge</h3>
-            <p className="text-sm text-gray-400">Query your documents</p>
-          </button>
-
-          <button className="bg-white/5 border border-white/10 hover:bg-white/10 p-6 rounded-2xl transition-all group text-left">
-            <Mic className="w-8 h-8 mb-4 text-[#8ecae6]" />
-            <h3 className="font-bold text-lg mb-1">Voice Mode</h3>
-            <p className="text-sm text-gray-400">Ask questions hands-free</p>
-          </button>
-
-          <button className="bg-white/5 border border-white/10 hover:bg-white/10 p-6 rounded-2xl transition-all group text-left">
-            <Settings className="w-8 h-8 mb-4 text-[#8ecae6]" />
-            <h3 className="font-bold text-lg mb-1">Settings</h3>
-            <p className="text-sm text-gray-400">Configure your workspace</p>
-          </button>
-        </div>
-
-        {/* Documents Section */}
-        <div className="bg-white/5 border border-white/10 rounded-[32px] p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold tracking-tight">Your Documents</h2>
-            <button className="text-sm font-bold text-[#8ecae6] hover:text-white transition-colors">
-              View all
-            </button>
+          {/* Scanning progress bar */}
+          <div className="mt-8 w-64 h-0.5 bg-white/10 rounded-full overflow-hidden">
+            <div className="scan-bar h-full bg-[#219ebc] rounded-full" />
           </div>
+        </div>
+      )}
 
-          {/* Empty State */}
-          <div className="text-center py-16">
-            <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <FileText className="w-8 h-8 text-gray-500" />
+      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
+      <aside className="w-80 border-r border-white/5 bg-white/[0.02] flex flex-col">
+        <div className="p-6 border-b border-white/5">
+          <input ref={sidebarInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
+          <button
+            onClick={() => !isUploading && sidebarInputRef.current?.click()}
+            disabled={isUploading}
+            className="w-full bg-[#219ebc] hover:bg-[#8ecae6] hover:text-[#023047] py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#219ebc]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Plus className="w-4 h-4" /> NEW DOCUMENT
+          </button>
+        </div>
+
+        <nav className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-1">
+          <div className="px-2 mb-4">
+            <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Core Library</span>
+          </div>
+          {documents.map(doc => (
+            <button
+              key={doc.id}
+              onClick={() => setActiveDoc(doc)}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${activeDoc?.id === doc.id ? 'bg-[#219ebc]/20 border-[#219ebc]/40 text-[#8ecae6]' : 'hover:bg-white/5 border-transparent text-gray-400 hover:text-white'}`}
+            >
+              <FileText className="w-4 h-4 flex-shrink-0" />
+              <div className="flex-1 text-left truncate">
+                <div className="text-sm font-bold truncate">{doc.name}</div>
+                <div className="text-[10px] opacity-50 uppercase tracking-tighter">{doc.status} // {doc.size}</div>
+              </div>
+              {activeDoc?.id === doc.id && <div className="w-1.5 h-1.5 rounded-full bg-[#8ecae6]" />}
+            </button>
+          ))}
+
+          <div className="mt-8 px-2 mb-4">
+            <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em]">Knowledge Graphs</span>
+          </div>
+          <button className="w-full flex items-center gap-3 p-3 rounded-xl text-gray-400 hover:bg-white/5 transition-all">
+            <History className="w-4 h-4" />
+            <span className="text-sm font-bold">Recent Inquiries</span>
+          </button>
+        </nav>
+
+        <div className="p-4 border-t border-white/5 bg-black/20">
+          <div className="flex items-center gap-3 mb-4 p-2">
+            <div className="w-10 h-10 rounded-full bg-[#219ebc]/30 border border-[#219ebc]/50 flex items-center justify-center">
+              <Terminal className="w-5 h-5 text-[#8ecae6]" />
             </div>
-            <h3 className="text-xl font-bold mb-2">No documents yet</h3>
-            <p className="text-gray-400 mb-6 max-w-md mx-auto">
-              Upload your first document to start building your knowledge graph.
-            </p>
-            <button className="bg-[#219ebc] hover:bg-[#8ecae6] hover:text-[#023047] px-6 py-3 rounded-xl font-bold transition-all inline-flex items-center gap-2">
-              <Plus className="w-5 h-5" />
-              Upload Document
-            </button>
+            <div className="flex-1">
+              <div className="text-sm font-bold truncate">{user?.email?.split('@')[0] || 'User'}</div>
+              <div className="text-[10px] text-green-500 font-bold uppercase tracking-widest animate-pulse">Online</div>
+            </div>
+            <Settings className="w-4 h-4 text-gray-500 cursor-pointer hover:text-white" />
           </div>
+          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold text-red-400/70 hover:text-red-400 transition-colors">
+            <LogOut className="w-3 h-3" /> TERMINATE SESSION
+          </button>
         </div>
-      </main>
+      </aside>
+
+      {/* ── After graph is generated: graph takes main area, chat collapses to right panel ── */}
+      {forceGraph ? (
+        <>
+          {/* Graph — fills the main flex-1 space */}
+          <main className="flex-1 flex flex-col relative bg-[#023047] overflow-hidden">
+            <header className="h-16 border-b border-white/5 px-8 flex items-center justify-between bg-white/[0.01] backdrop-blur-md z-10 shrink-0">
+              <Link href="/" className="flex items-center gap-3">
+                <Image src="/MainLogo.png" alt="CogniLink" width={40} height={40} className="drop-shadow-lg" />
+                <span className="text-xl font-bold tracking-tighter">CogniLink</span>
+              </Link>
+              <div className="flex items-center gap-4">
+                {/* Legend inline in header */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-bold">
+                    <div className="w-5 h-px bg-white/25" /><span className="uppercase tracking-wider">Prerequisite</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-gray-500 font-bold">
+                    <div className="w-5 h-px bg-[#8ecae6]" /><span className="uppercase tracking-wider">Related</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setGraphData(null)}
+                  className="text-[10px] font-bold text-white/30 hover:text-white uppercase tracking-widest border border-white/10 hover:border-white/30 px-3 py-1.5 rounded-lg transition-all"
+                >
+                  ← Back to Chat
+                </button>
+                <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center cursor-pointer hover:bg-white/10">
+                  <MoreVertical className="w-4 h-4" />
+                </div>
+              </div>
+            </header>
+
+            {/* ForceGraph fills the entire remaining area */}
+            <div className="flex-1 relative min-h-0 overflow-hidden">
+              <div className="absolute inset-0">
+                {forceGraph && <NoSSRForceGraph graphData={forceGraph} onNodeClick={(id) => setSelectedNodeIndex(id)} />}
+              </div>
+              {isGeneratingGraph && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-10 h-10 text-[#8ecae6] animate-spin" />
+                    <p className="text-[10px] font-bold text-[#8ecae6] uppercase tracking-widest">Regenerating…</p>
+                  </div>
+                </div>
+              )}
+            </div>{/* end flex-1 relative */}
+          </main>
+
+          {/* Chat — collapsed to right panel */}
+          <aside className="w-96 border-l border-white/5 bg-white/[0.01] flex flex-col">
+            {/* Topic summary panel — shown when a node is clicked */}
+            {selectedNodeIndex !== null && graphData && (
+              <div className="p-5 border-b border-white/5 shrink-0">
+                <div className="flex items-center justify-between mb-3">
+                  <h5 className="text-[10px] font-bold text-[#8ecae6] uppercase tracking-[0.4em]">Topic Detail</h5>
+                  <button
+                    onClick={() => setSelectedNodeIndex(null)}
+                    className="text-[10px] font-bold text-white/30 hover:text-white uppercase tracking-wider"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="bg-[#219ebc]/10 border border-[#219ebc]/30 rounded-xl p-4">
+                  <h6 className="text-sm font-bold text-white mb-2">{graphData.labels[selectedNodeIndex]}</h6>
+                  <p className="text-xs text-gray-300 leading-relaxed">
+                    {graphData.label_summary?.[selectedNodeIndex] ?? 'No summary available.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="p-5 border-b border-white/5 shrink-0">
+              <h5 className="text-[10px] font-bold text-white/30 uppercase tracking-[0.4em] mb-4">Chat</h5>
+
+              {/* Re-generate prompt */}
+              {activeFile && (
+                <div className="mb-2 flex items-center gap-1.5 text-[10px] text-[#8ecae6]/70 font-bold uppercase tracking-wider">
+                  <FileText className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">{activeFile.name}</span>
+                </div>
+              )}
+              <textarea
+                value={graphPrompt}
+                onChange={e => setGraphPrompt(e.target.value)}
+                placeholder="Regenerate graph with a new prompt…"
+                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-xs outline-none placeholder:text-gray-600 font-bold resize-none h-16 focus:border-[#219ebc]/50 transition-all"
+              />
+              <button
+                onClick={handleGenerateGraph}
+                disabled={!graphPrompt.trim() || isGeneratingGraph}
+                className="w-full mt-2 bg-[#219ebc] hover:bg-[#8ecae6] hover:text-[#023047] py-2 rounded-xl font-bold text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGeneratingGraph
+                  ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating…</>
+                  : 'Regenerate Graph'
+                }
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 min-h-0">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-full p-4 rounded-2xl border text-xs ${msg.role === 'user' ? 'bg-[#219ebc]/10 border-[#219ebc]/30' : 'bg-white/5 border-white/10'}`}>
+                    <div className="flex items-center gap-1.5 mb-2 text-[9px] font-bold uppercase tracking-widest text-[#8ecae6]">
+                      {msg.role === 'user' ? <Terminal className="w-2.5 h-2.5" /> : <Brain className="w-2.5 h-2.5" />}
+                      {msg.role === 'user' ? 'You' : 'System'}
+                    </div>
+                    <p className="leading-relaxed text-gray-200">{msg.content}</p>
+                  </div>
+                </div>
+              ))}
+              {isScanning && (
+                <div className="flex gap-1 p-3">
+                  {[0, 0.2, 0.4].map((d, i) => (
+                    <div key={i} className="w-1.5 h-1.5 bg-[#8ecae6] rounded-full animate-bounce" style={{ animationDelay: `${d}s` }} />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Input */}
+            <div className="p-4 border-t border-white/5 shrink-0">
+              <div className="flex items-center gap-2 bg-black/20 border border-white/10 rounded-2xl px-3 focus-within:border-[#219ebc]/50 transition-all">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleScan()}
+                  placeholder="Ask about the graph…"
+                  className="flex-1 bg-transparent py-3 text-xs outline-none placeholder:text-gray-600 font-bold"
+                />
+                <button
+                  onClick={handleScan}
+                  disabled={!query.trim() || isScanning}
+                  className="w-8 h-8 bg-[#219ebc] rounded-lg flex items-center justify-center text-[#023047] hover:bg-[#8ecae6] transition-all disabled:opacity-30"
+                >
+                  <ChevronRight className="w-4 h-4" strokeWidth={3} />
+                </button>
+              </div>
+            </div>
+          </aside>
+        </>
+      ) : (
+        <>
+          {/* ── Original layout: chat in main, graph prompt in right panel ── */}
+          <main className="flex-1 flex flex-col relative bg-[#023047]">
+            <header className="h-16 border-b border-white/5 px-8 flex items-center justify-between bg-white/[0.01] backdrop-blur-md z-10">
+              <Link href="/" className="flex items-center gap-3">
+                <Image src="/MainLogo.png" alt="CogniLink" width={40} height={40} className="drop-shadow-lg" />
+                <span className="text-xl font-bold tracking-tighter">CogniLink</span>
+              </Link>
+              <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center cursor-pointer hover:bg-white/10">
+                <MoreVertical className="w-4 h-4" />
+              </div>
+            </header>
+
+            <div className="flex-1 flex flex-col overflow-hidden p-8 gap-8">
+              {activeDoc ? (
+                <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto custom-scrollbar space-y-6 pr-4">
+                    {messages.length === 0 && (
+                      <div className="h-full flex flex-col items-center justify-center text-center opacity-30">
+                        <Sparkles className="w-12 h-12 mb-4 text-[#8ecae6]" />
+                        <h4 className="text-xl font-bold uppercase tracking-widest">Cognition Engine Ready</h4>
+                        <p className="max-w-xs text-sm mt-2">Ask a question or generate the graph from the right panel.</p>
+                      </div>
+                    )}
+                    {messages.map((msg, i) => (
+                      <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-2xl p-6 rounded-2xl border ${msg.role === 'user' ? 'bg-[#219ebc]/10 border-[#219ebc]/30' : 'bg-white/5 border-white/10 shadow-xl'}`}>
+                          <div className="flex items-center gap-2 mb-3 text-[10px] font-bold uppercase tracking-widest text-[#8ecae6]">
+                            {msg.role === 'user' ? <Terminal className="w-3 h-3" /> : <Brain className="w-3 h-3" />}
+                            {msg.role === 'user' ? 'Local_Request' : 'System_Output'}
+                          </div>
+                          <p className="text-sm leading-relaxed text-gray-200">{msg.content}</p>
+                        </div>
+                      </div>
+                    ))}
+                    {isScanning && (
+                      <div className="flex justify-start">
+                        <div className="bg-white/5 border border-white/10 p-4 rounded-2xl animate-pulse flex items-center gap-4">
+                          <div className="flex gap-1">
+                            {[0, 0.2, 0.4].map((d, i) => (
+                              <div key={i} className="w-1.5 h-1.5 bg-[#8ecae6] rounded-full animate-bounce" style={{ animationDelay: `${d}s` }} />
+                            ))}
+                          </div>
+                          <span className="text-xs font-bold text-[#8ecae6] uppercase tracking-[0.2em]">Generating…</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input bar */}
+                  <div className="bg-white/5 border border-white/10 rounded-[32px] p-2 backdrop-blur-xl shadow-2xl">
+                    <div className="flex items-center gap-2 p-2">
+                      <div className="flex-1 flex items-center px-4 bg-black/20 rounded-2xl border border-white/5 focus-within:border-[#219ebc]/50 transition-all">
+                        <Search className="w-4 h-4 text-gray-500 mr-3" />
+                        <input
+                          type="text"
+                          value={query}
+                          onChange={e => setQuery(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleScan()}
+                          placeholder="Ask a question about the document…"
+                          className="flex-1 bg-transparent py-4 text-sm outline-none placeholder:text-gray-600 font-bold"
+                        />
+                        <button
+                          onClick={handleScan}
+                          disabled={!query.trim() || isScanning}
+                          className="w-10 h-10 bg-[#219ebc] rounded-xl flex items-center justify-center text-[#023047] hover:bg-[#8ecae6] transition-all disabled:opacity-30"
+                        >
+                          <ChevronRight className="w-5 h-5" strokeWidth={3} />
+                        </button>
+                      </div>
+                      <button
+                        onClick={toggleVoice}
+                        className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-xl ${isListening ? 'bg-red-500' : 'bg-[#023047] border border-white/10 hover:border-[#8ecae6] text-[#8ecae6]'}`}
+                      >
+                        <Mic className="w-6 h-6" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+              ) : (
+                /* Empty state / drop zone */
+                <div
+                  className="flex-1 flex flex-col items-center justify-center text-center"
+                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && !isUploading) processFile(file);
+                  }}
+                >
+                  <input ref={dropzoneInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isUploading) dropzoneInputRef.current?.click();
+                    }}
+                    className="w-32 h-32 bg-[#219ebc]/10 rounded-[40px] border border-[#219ebc]/20 flex items-center justify-center mb-10 cursor-pointer hover:bg-[#219ebc]/20 transition-all relative"
+                  >
+                    <div className="absolute inset-0 border-2 border-dashed border-[#219ebc]/40 m-2 rounded-[32px]" />
+                    <Upload className="w-10 h-10 text-[#219ebc]" />
+                  </button>
+                  <h2 className="text-4xl font-bold mb-4 tracking-tighter uppercase">Initialise Resource</h2>
+                  <p className="text-gray-400 max-w-sm mb-6">Drop a PDF or click to upload and start the cognition scan.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isUploading) dropzoneInputRef.current?.click();
+                    }}
+                    disabled={isUploading}
+                    className="mb-12 bg-[#219ebc] hover:bg-[#8ecae6] hover:text-[#023047] text-white px-8 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#219ebc]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Upload className="w-4 h-4" /> Upload Document
+                  </button>
+                  <div className="grid grid-cols-2 gap-4 w-full max-w-xl">
+                    <div
+                      onClick={() => documents[0] && setActiveDoc(documents[0])}
+                      className="p-6 bg-white/5 border border-white/10 rounded-3xl text-left hover:border-[#8ecae6]/40 transition-all cursor-pointer"
+                    >
+                      <History className="w-6 h-6 text-[#8ecae6] mb-4" />
+                      <div className="text-sm font-bold uppercase mb-1">Resume Last</div>
+                      <div className="text-xs text-gray-500">{documents[0]?.name.replace('.pdf', '') ?? '—'}</div>
+                    </div>
+                    <div className="p-6 bg-white/5 border border-white/10 rounded-3xl text-left hover:border-[#8ecae6]/40 transition-all cursor-pointer">
+                      <Command className="w-6 h-6 text-[#8ecae6] mb-4" />
+                      <div className="text-sm font-bold uppercase mb-1">Search Global</div>
+                      <div className="text-xs text-gray-500">Scan across all resources</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </main>
+
+          {/* Right panel — graph prompt only (no graph yet) */}
+          <aside className="w-80 border-l border-white/5 bg-white/[0.01] hidden xl:flex flex-col">
+            <div className="p-6 border-b border-white/5">
+              <h5 className="text-[10px] font-bold text-white/30 uppercase tracking-[0.4em]">Knowledge Graph</h5>
+            </div>
+            <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+              {/* Placeholder */}
+              <div className="flex-1 bg-black/30 rounded-2xl border border-white/10 flex flex-col items-center justify-center opacity-30">
+                <Sparkles className="w-8 h-8 mb-2 text-[#8ecae6]" />
+                <p className="text-[10px] font-bold uppercase tracking-widest">No Graph Yet</p>
+                <p className="text-[9px] mt-1 text-gray-500">Upload a doc or use the prompt below</p>
+              </div>
+              {/* Prompt box */}
+              <div className="shrink-0">
+                {activeFile && (
+                  <div className="mb-2 flex items-center gap-1.5 text-[10px] text-[#8ecae6]/70 font-bold uppercase tracking-wider">
+                    <FileText className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{activeFile.name}</span>
+                  </div>
+                )}
+                <textarea
+                  value={graphPrompt}
+                  onChange={e => setGraphPrompt(e.target.value)}
+                  placeholder={activeFile ? `Ask about ${activeFile.name}…` : 'Enter a topic prompt for the graph…'}
+                  className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-sm outline-none placeholder:text-gray-600 font-bold resize-none h-20 focus:border-[#219ebc]/50 transition-all"
+                />
+                <button
+                  onClick={handleGenerateGraph}
+                  disabled={!graphPrompt.trim() || isGeneratingGraph}
+                  className="w-full mt-2 bg-[#219ebc] hover:bg-[#8ecae6] hover:text-[#023047] py-2.5 rounded-xl font-bold text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingGraph
+                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating…</>
+                    : 'Generate Graph'
+                  }
+                </button>
+              </div>
+            </div>
+          </aside>
+        </>
+      )}
+
     </div>
   );
 }
