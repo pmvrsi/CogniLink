@@ -262,7 +262,42 @@ export default function DashboardPage() {
     })();
   }, [router, supabase.auth]);
 
+  // ── Persist session to localStorage ──────────────────────────────────────
+
+  // Load persisted state once on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('cl_session');
+      if (!saved) return;
+      const { graphData: gd, documents: docs, messages: msgs, shareUrl: su, activeDocId } = JSON.parse(saved);
+      if (gd) setGraphData(gd);
+      if (docs?.length) {
+        setDocuments(docs);
+        if (activeDocId) {
+          const found = docs.find((d: Doc) => d.id === activeDocId);
+          if (found) setActiveDoc(found);
+        }
+      }
+      if (msgs?.length) setMessages(msgs);
+      if (su) setShareUrl(su);
+    } catch {}
+  }, []);
+
+  // Save to localStorage whenever relevant state changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('cl_session', JSON.stringify({
+        graphData,
+        documents,
+        messages,
+        shareUrl,
+        activeDocId: activeDoc?.id ?? null,
+      }));
+    } catch {}
+  }, [graphData, documents, messages, shareUrl, activeDoc]);
+
   const handleLogout = async () => {
+    localStorage.removeItem('cl_session');
     await supabase.auth.signOut();
     router.push('/');
     router.refresh();
