@@ -845,6 +845,18 @@ export default function DashboardPage() {
                     : 'Generate Graph'
                   }
                 </button>
+                <button
+                  onClick={handleShare}
+                  disabled={!graphData || isSharing}
+                  className="w-full mt-2 bg-white/5 hover:bg-white/10 border border-white/10 py-2.5 rounded-xl font-bold text-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  {isSharing
+                    ? <><Loader2 className="w-3 h-3 animate-spin" /> Saving…</>
+                    : shareCopied
+                    ? <><Check className="w-3 h-3 text-green-400" /> <span className="text-green-400">Link Copied!</span></>
+                    : <><Share2 className="w-3 h-3" /> Share Graph</>
+                  }
+                </button>
               </div>
             </div>
           </aside>
