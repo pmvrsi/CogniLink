@@ -18,18 +18,18 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="relative pt-48 pb-32 px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-6xl md:text-[80px] font-bold mb-8 tracking-tighter leading-[1] text-white">
+          <h1 className="anim-focus-in text-6xl md:text-[80px] font-bold mb-8 tracking-tighter leading-[1] text-white">
             Link your Learning, <br />
             <span className="text-[#8ecae6]">Connect your cognition.</span>
           </h1>
 
-          <p className="max-w-xl mx-auto text-lg md:text-xl text-gray-400 mb-12 leading-relaxed">
+          <p className="anim-fade-up delay-300 max-w-xl mx-auto text-lg md:text-xl text-gray-400 mb-12 leading-relaxed">
             [system_scan]: CogniLink builds a conversational knowledge graph from your resources.
             Ask anything, summarise instantly, and learn via voice.
           </p>
 
-          <div className="flex justify-center items-center mb-24">
-            <Link 
+          <div className="anim-fade-up delay-500 flex justify-center items-center mb-24">
+            <Link
               href="/login"
               className="bg-[#8ecae6] text-[#023047] px-10 py-4 rounded-full font-bold text-lg transition-all flex items-center gap-2 hover:bg-white hover:shadow-lg hover:shadow-[#8ecae6]/20 active:scale-95"
             >
@@ -40,7 +40,7 @@ export default function HomePage() {
         </div>
 
         {/* Visual Product Card */}
-        <div className="max-w-6xl mx-auto px-4">
+        <div className="anim-fade-up delay-700 max-w-6xl mx-auto px-4">
           <div className="relative group pb-24">
             {/* Floating Icons Behind - positioned below card */}
             <div className="absolute inset-x-0 bottom-0 h-48 pointer-events-none">
@@ -115,7 +115,7 @@ export default function HomePage() {
         </div>
         
         {/* Used by students at */}
-        <div className="max-w-4xl mx-auto mt-16 text-center">
+        <div className="anim-fade-in delay-1000 max-w-4xl mx-auto mt-16 text-center">
           <p className="text-gray-500 text-sm uppercase tracking-widest mb-8">Used by students at</p>
           <div className="flex items-center justify-center gap-12 flex-wrap">
             <Image 
@@ -153,7 +153,7 @@ export default function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
             {/* Feature 1: Large Card */}
-            <div className="md:col-span-2 bg-white/5 border border-white/10 rounded-[40px] p-10 hover:bg-white/[0.07] transition-all duration-500 overflow-hidden relative group">
+            <div className="anim-fade-up delay-100 md:col-span-2 bg-white/5 border border-white/10 rounded-[40px] p-10 hover:bg-white/[0.07] transition-all duration-500 overflow-hidden relative group">
               <div className="max-w-md relative z-10">
                 <div className="w-12 h-12 bg-[#8ecae6]/20 rounded-2xl flex items-center justify-center mb-6">
                   <Brain className="w-6 h-6 text-[#8ecae6]" />
@@ -172,7 +172,7 @@ export default function HomePage() {
             </div>
 
             {/* Feature 2: Tall Card */}
-            <div className="bg-[#219ebc] rounded-[40px] p-10 flex flex-col justify-between group cursor-pointer hover:shadow-2xl transition-all">
+            <div className="anim-fade-up delay-200 bg-[#219ebc] rounded-[40px] p-10 flex flex-col justify-between group cursor-pointer hover:shadow-2xl transition-all">
               <div>
                 <div className="w-12 h-12 bg-[#023047]/20 rounded-2xl flex items-center justify-center mb-6">
                   <Brain className="w-6 h-6 text-[#023047]" />
@@ -192,7 +192,7 @@ export default function HomePage() {
             </div>
 
             {/* Feature 3: Small Card */}
-            <div className="bg-white/5 border border-white/10 rounded-[40px] p-10 hover:border-[#8ecae6]/30 transition-all">
+            <div className="anim-fade-up delay-300 bg-white/5 border border-white/10 rounded-[40px] p-10 hover:border-[#8ecae6]/30 transition-all">
               <div className="w-12 h-12 bg-[#8ecae6]/20 rounded-2xl flex items-center justify-center mb-6">
                 <Flame className="w-6 h-6 text-[#8ecae6]" />
               </div>
@@ -203,7 +203,7 @@ export default function HomePage() {
             </div>
 
             {/* Feature 4: Wide Card */}
-            <div className="md:col-span-2 bg-white/5 border border-white/10 rounded-[40px] p-10 flex flex-col md:flex-row items-center gap-10 overflow-hidden group">
+            <div className="anim-fade-up delay-400 md:col-span-2 bg-white/5 border border-white/10 rounded-[40px] p-10 flex flex-col md:flex-row items-center gap-10 overflow-hidden group">
               <div className="flex-1">
                 <div className="w-12 h-12 bg-[#8ecae6]/20 rounded-2xl flex items-center justify-center mb-6">
                   <Users className="w-6 h-6 text-[#8ecae6]" />

@@ -20,3 +20,38 @@ body {
   font-family: 'Ubuntu Mono', monospace;
   min-height: 100%;
 }
+
+/* ── Animista: text-focus-in ── */
+@keyframes text-focus-in {
+  0%   { filter: blur(12px); opacity: 0; }
+  100% { filter: blur(0px);  opacity: 1; }
+}
+
+/* ── fade-up ── */
+@keyframes fade-up {
+  0%   { opacity: 0; transform: translateY(28px); }
+  100% { opacity: 1; transform: translateY(0);    }
+}
+
+/* ── fade-in ── */
+@keyframes fade-in {
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+/* Utility classes */
+.anim-focus-in  { animation: text-focus-in 0.9s cubic-bezier(0.55, 0.085, 0.68, 0.53) both; }
+.anim-fade-up   { animation: fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-fade-in   { animation: fade-in 0.8s ease both; }
+
+.delay-100  { animation-delay: 0.1s; }
+.delay-200  { animation-delay: 0.2s; }
+.delay-300  { animation-delay: 0.3s; }
+.delay-400  { animation-delay: 0.4s; }
+.delay-500  { animation-delay: 0.5s; }
+.delay-600  { animation-delay: 0.6s; }
+.delay-700  { animation-delay: 0.7s; }
+.delay-800  { animation-delay: 0.8s; }
+.delay-900  { animation-delay: 0.9s; }
+.delay-1000 { animation-delay: 1.0s; }
+.delay-1200 { animation-delay: 1.2s; }
