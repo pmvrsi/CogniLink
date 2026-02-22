@@ -402,14 +402,14 @@ export default function DashboardPage() {
             <div className="flex-1 relative min-h-0 overflow-hidden">
               <div ref={graphContainerRef} className="absolute inset-0">
               <ForceGraph2D
+                nodeLabel={(node) => (node as unknown as ForceNode).label}
+                linkColor={(link) => (link as unknown as ForceLink).bidirectional ? "#8ecae6" : "rgba(255,255,255,0.25)"}
                 width={graphSize.width}
                 height={graphSize.height}
                 graphData={forceGraph}
                 backgroundColor="transparent"
-                nodeLabel={(node: ForceNode) => node.label}
                 nodeColor={() => '#219ebc'}
                 nodeRelSize={7}
-                linkColor={(link: ForceLink) => link.bidirectional ? '#8ecae6' : 'rgba(255,255,255,0.25)'}
                 linkWidth={1.5}
                 linkDirectionalArrowLength={(link: ForceLink) => link.bidirectional ? 0 : 6}
                 linkDirectionalArrowRelPos={1}
