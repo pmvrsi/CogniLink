@@ -97,23 +97,16 @@ export default function HomePage() {
             </div>
 
             {/* Feature 2: Tall Card */}
-            <div className="anim-fade-up delay-200 bg-[#219ebc] rounded-[40px] p-10 flex flex-col justify-between group cursor-pointer hover:shadow-2xl transition-all">
-              <div>
-                <div className="w-12 h-12 bg-[#023047]/20 rounded-2xl flex items-center justify-center mb-6">
-                  <Brain className="w-6 h-6 text-[#023047]" />
-                </div>
-                <h3 className="text-3xl font-bold mb-4 tracking-tight text-[#023047] uppercase">
-                  02 // Knowledge Graphs
-                </h3>
-                <p className="text-[#023047]/70 font-bold">
-                  [GRAPH_MODE]: Expand your learning into interconnected visual graphs. See how topics relate, discover hidden connections, and navigate complex subjects with ease.
-                </p>
+            <div className="anim-fade-up delay-200 bg-white/5 border border-white/10 rounded-[40px] p-10 hover:bg-white/[0.07] transition-all duration-500 overflow-hidden relative group">
+              <div className="w-12 h-12 bg-[#8ecae6]/20 rounded-2xl flex items-center justify-center mb-6">
+                <Brain className="w-6 h-6 text-[#8ecae6]" />
               </div>
-              <div className="flex justify-end">
-                <div className="w-12 h-12 bg-[#023047] rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <ArrowRight className="w-5 h-5 text-white" />
-                </div>
-              </div>
+              <h3 className="text-3xl font-bold mb-4 tracking-tight uppercase">
+                02 // Knowledge Graphs
+              </h3>
+              <p className="text-gray-400 leading-relaxed">
+                [GRAPH_MODE]: Expand your learning into interconnected visual graphs. See how topics relate, discover hidden connections, and navigate complex subjects with ease.
+              </p>
             </div>
 
             {/* Feature 3: Small Card */}
