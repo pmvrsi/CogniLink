@@ -286,7 +286,7 @@ export default function DashboardPage() {
     formData.append('files', file);
 
     try {
-      setUploadStatus('Analysing with Gemini — extracting topics and relationships…');
+      setUploadStatus('Analysing document, Extracting topics and relationships');
       const res  = await fetch('/api/chat', { method: 'POST', body: formData });
       const data = await res.json() as GraphData;
 
