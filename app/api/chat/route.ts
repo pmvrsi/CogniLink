@@ -18,11 +18,10 @@ const ADJ_MATRIX_SCHEMA = {
       items: {
         type: "array",
         items: {
-          type: "integer",
-          enum: [0, 1]
+          type: "integer"
         }
       },
-      description: "n×n matrix of 0s and 1s. adjacencyMatrix[i][j]=1 means topic i is a prerequisite for topic j. No bidirectional entries (i.e. if [i][j]=1 then [j][i] must be 0)."
+      description: "nxn matrix of 0s and 1s. adjacencyMatrix[i][j]=1 means topic i is a prerequisite for topic j. No bidirectional entries (i.e. if [i][j]=1 then [j][i] must be 0)."
     }
   },
   required: ["n", "labels", "adjacencyMatrix"]
@@ -37,6 +36,7 @@ Rules:
 - Only encode prerequisite relationships. Do NOT encode bidirectional "related" links.
 - adjacencyMatrix[i][j] = 1 means topic i is a prerequisite for topic j.
 - adjacencyMatrix[i][j] = 0 otherwise.
+- All values in adjacencyMatrix must be 0 or 1.
 - The matrix must be strictly n×n where n = labels.length.
 - The matrix must have no entry where both [i][j]=1 and [j][i]=1 (no cycles).
 
@@ -62,7 +62,6 @@ export async function POST(req: Request) {
     }
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
-
     // Upload all files to Gemini Files API and collect their URIs
     const uploadedFileParts = await Promise.all(
       files.map(async (file) => {

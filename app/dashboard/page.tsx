@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
@@ -12,9 +11,7 @@ import {
   Command, History, MoreVertical, Loader2
 } from 'lucide-react';
 import Link from 'next/link';
-
-// ForceGraph must be loaded client-side only — it uses browser APIs
-const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
+import NoSSRForceGraph, { adjacencyMatrixToGraphData, type ForceGraphData } from '@/lib/NoSSRForceGraph';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,36 +28,11 @@ interface Message {
   content: string;
 }
 
-// Shape returned by /api/chat (your Gemini schema)
+// Shape returned by /api/chat (Gemini schema)
 interface GraphData {
   n: number;
   labels: string[];
   adjacencyMatrix: number[][];
-}
-
-// Shape that react-force-graph-2d expects
-interface ForceNode { id: string; label: string; x?: number; y?: number; }
-interface ForceLink { source: string; target: string; bidirectional: boolean; }
-
-// Convert the adjacency-matrix schema → force-graph nodes + links
-function toForceGraph(data: GraphData) {
-  const nodes: ForceNode[] = data.labels.map((label, i) => ({ id: String(i), label }));
-  const links: ForceLink[] = [];
-
-  for (let i = 0; i < data.n; i++) {
-    for (let j = 0; j < data.n; j++) {
-      if (data.adjacencyMatrix[i][j] === 1) {
-        // For bidirectional pairs only emit one link (i < j) marked as bidirectional
-        if (data.adjacencyMatrix[j][i] === 1 && j < i) continue;
-        links.push({
-          source: String(i),
-          target: String(j),
-          bidirectional: data.adjacencyMatrix[j][i] === 1,
-        });
-      }
-    }
-  }
-  return { nodes, links };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -85,8 +57,6 @@ export default function DashboardPage() {
   const [graphData, setGraphData]               = useState<GraphData | null>(null);
   const [graphPrompt, setGraphPrompt]           = useState('');
   const [isGeneratingGraph, setIsGeneratingGraph] = useState(false);
-  const graphContainerRef = useRef<HTMLDivElement>(null);
-  const [graphSize, setGraphSize] = useState({ width: 280, height: 320 });
 
   const [documents, setDocuments] = useState<Doc[]>([
     { id: 1, name: 'Quantum_Physics_Ch4.pdf',     size: '12.4 MB', date: '2024-03-15', status: 'Analysed' },
@@ -97,31 +67,14 @@ export default function DashboardPage() {
   const router   = useRouter();
   const supabase = createClient();
 
-  // Auth check
+  // Auth check — no redirect in dev; middleware handles auth in production
   useEffect(() => {
     (async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) router.push('/login');
-      else setUser(user);
+      if (user) setUser(user);
       setLoading(false);
     })();
   }, [router, supabase.auth]);
-
-  // useLayoutEffect fires synchronously before paint so ForceGraph2D gets
-  // the real container dimensions immediately, not the 280x320 placeholder.
-  // Depends on [forceGraph] so the effect re-runs once the graph container
-  // is actually mounted in the DOM.
-  useLayoutEffect(() => {
-    const el = graphContainerRef.current;
-    if (!el) return;
-    const { width, height } = el.getBoundingClientRect();
-    if (width > 0 && height > 0) setGraphSize({ width, height });
-    const ro = new ResizeObserver(([entry]) => {
-      setGraphSize({ width: entry.contentRect.width, height: entry.contentRect.height });
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [graphData]); // graphData changing means forceGraph changed and container is now mounted
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -175,14 +128,14 @@ export default function DashboardPage() {
     } finally {
       setIsUploading(false);
       setUploadStatus('');
-      if (sidebarInputRef.current)  sidebarInputRef.current.value  = '';
-      if (dropzoneInputRef.current) dropzoneInputRef.current.value = '';
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) processFile(file);
+    // Reset value so the same file can be re-selected
+    e.target.value = '';
   };
 
   // ── Right-panel Generate Graph button ─────────────────────────────────────
@@ -252,7 +205,9 @@ export default function DashboardPage() {
   const toggleVoice = () => setIsListening(v => !v);
 
   // Convert GraphData → ForceGraph format for the renderer
-  const forceGraph = graphData ? toForceGraph(graphData) : null;
+  const forceGraph: ForceGraphData | null = graphData
+    ? adjacencyMatrixToGraphData(graphData.n, graphData.labels, graphData.adjacencyMatrix)
+    : null;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -396,41 +351,11 @@ export default function DashboardPage() {
               </div>
             </header>
 
-            {/* ForceGraph2D fills the entire remaining area.
-                 The outer div takes flex-1 space; the inner absolute div
-                 gives ResizeObserver and ForceGraph2D a concrete pixel rect. */}
+            {/* ForceGraph fills the entire remaining area */}
             <div className="flex-1 relative min-h-0 overflow-hidden">
-              <div ref={graphContainerRef} className="absolute inset-0">
-              <ForceGraph2D
-                nodeLabel={(node) => (node as unknown as ForceNode).label}
-                linkColor={(link) => (link as unknown as ForceLink).bidirectional ? "#8ecae6" : "rgba(255,255,255,0.25)"}
-                width={graphSize.width}
-                height={graphSize.height}
-                graphData={forceGraph}
-                backgroundColor="transparent"
-                nodeColor={() => '#219ebc'}
-                nodeRelSize={7}
-                linkWidth={1.5}
-                linkDirectionalArrowLength={(link: ForceLink) => link.bidirectional ? 0 : 6}
-                linkDirectionalArrowRelPos={1}
-                linkCurvature={(link: ForceLink) => link.bidirectional ? 0.25 : 0}
-                nodeCanvasObject={(node: ForceNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-                  const r        = 7;
-                  const fontSize = Math.max(12 / globalScale, 4);
-                  ctx.beginPath();
-                  ctx.arc(node.x ?? 0, node.y ?? 0, r, 0, 2 * Math.PI);
-                  ctx.fillStyle   = '#219ebc';
-                  ctx.fill();
-                  ctx.strokeStyle = '#8ecae6';
-                  ctx.lineWidth   = 1.5;
-                  ctx.stroke();
-                  ctx.font      = `bold ${fontSize}px "Ubuntu Mono", monospace`;
-                  ctx.fillStyle = 'rgba(255,255,255,0.9)';
-                  ctx.textAlign = 'center';
-                  ctx.fillText(node.label, node.x ?? 0, (node.y ?? 0) + r + fontSize + 2);
-                }}
-                nodeCanvasObjectMode={() => 'replace'}
-              />
+              <div className="absolute inset-0">
+                {forceGraph && <NoSSRForceGraph graphData={forceGraph} />}
+              </div>
               {isGeneratingGraph && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                   <div className="flex flex-col items-center gap-3">
@@ -439,7 +364,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
               )}
-              </div>{/* end absolute inset-0 */}
             </div>{/* end flex-1 relative */}
           </main>
 
@@ -601,17 +525,39 @@ export default function DashboardPage() {
 
               ) : (
                 /* Empty state / drop zone */
-                <div className="flex-1 flex flex-col items-center justify-center text-center">
+                <div
+                  className="flex-1 flex flex-col items-center justify-center text-center"
+                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file && !isUploading) processFile(file);
+                  }}
+                >
                   <input ref={dropzoneInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleFileChange} />
-                  <div
-                    onClick={() => !isUploading && dropzoneInputRef.current?.click()}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isUploading) dropzoneInputRef.current?.click();
+                    }}
                     className="w-32 h-32 bg-[#219ebc]/10 rounded-[40px] border border-[#219ebc]/20 flex items-center justify-center mb-10 cursor-pointer hover:bg-[#219ebc]/20 transition-all relative"
                   >
                     <div className="absolute inset-0 border-2 border-dashed border-[#219ebc]/40 m-2 rounded-[32px]" />
                     <Upload className="w-10 h-10 text-[#219ebc]" />
-                  </div>
+                  </button>
                   <h2 className="text-4xl font-bold mb-4 tracking-tighter uppercase">Initialise Resource</h2>
-                  <p className="text-gray-400 max-w-sm mb-12">Drop a PDF to start the cognition scan.</p>
+                  <p className="text-gray-400 max-w-sm mb-6">Drop a PDF or click to upload and start the cognition scan.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isUploading) dropzoneInputRef.current?.click();
+                    }}
+                    disabled={isUploading}
+                    className="mb-12 bg-[#219ebc] hover:bg-[#8ecae6] hover:text-[#023047] text-white px-8 py-3 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#219ebc]/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Upload className="w-4 h-4" /> Upload Document
+                  </button>
                   <div className="grid grid-cols-2 gap-4 w-full max-w-xl">
                     <div
                       onClick={() => documents[0] && setActiveDoc(documents[0])}
