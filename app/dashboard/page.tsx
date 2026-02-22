@@ -137,7 +137,7 @@ function StreakWidget({ userId }: { userId: string | null }) {
 
   if (loading) {
     return (
-      <div className="bg-gradient-to-br from-[#0d1117] to-[#161b22] border border-[#8ecae6]/20 rounded-2xl p-6 w-full animate-pulse mb-6">
+      <div className="bg-[#023047] border border-[#219ebc]/20 rounded-2xl p-6 w-full animate-pulse mb-6">
         <div className="h-6 bg-white/10 rounded w-1/2 mb-4"></div>
         <div className="h-16 bg-white/10 rounded w-1/3 mb-6"></div>
         <div className="flex justify-between">
@@ -150,9 +150,9 @@ function StreakWidget({ userId }: { userId: string | null }) {
   }
 
   return (
-    <div className="bg-gradient-to-br from-[#0d1117] to-[#161b22] border border-[#8ecae6]/20 rounded-2xl p-6 w-full shadow-lg shadow-[#8ecae6]/5 mb-6">
+    <div className="bg-[#023047] border border-[#219ebc]/20 rounded-2xl p-6 w-full shadow-lg shadow-[#219ebc]/10 mb-6">
       <div className="flex items-center gap-4 mb-4">
-        <div className="w-10 h-10 bg-gradient-to-br from-[#8ecae6]/30 to-[#8ecae6]/10 rounded-xl flex items-center justify-center border border-[#8ecae6]/30">
+        <div className="w-10 h-10 bg-[#219ebc]/20 rounded-xl flex items-center justify-center border border-[#219ebc]/30">
           <Flame className="w-5 h-5 text-[#8ecae6]" />
         </div>
         <div>
@@ -164,13 +164,13 @@ function StreakWidget({ userId }: { userId: string | null }) {
         <span className="text-4xl font-bold text-white tracking-tight" style={{ fontFamily: 'system-ui, -apple-system, sans-serif', fontVariantNumeric: 'tabular-nums' }}>{streakData.currentStreak}</span>
         <span className="text-[#8ecae6]/80 text-base font-medium pb-2">days</span>
         {streakData.currentStreak > 0 && (
-          <div className="w-8 h-8 bg-[#8ecae6]/20 rounded-xl flex items-center justify-center animate-pulse ml-auto">
+          <div className="w-8 h-8 bg-[#219ebc]/20 rounded-xl flex items-center justify-center animate-pulse ml-auto">
             <Zap className="w-4 h-4 text-[#8ecae6]" />
           </div>
         )}
       </div>
       <div className="mb-4">
-        <p className="text-gray-500 text-xs uppercase tracking-widest mb-2">Last 7 Days</p>
+        <p className="text-gray-400 text-xs uppercase tracking-widest mb-2">Last 7 Days</p>
         <div className="flex justify-between gap-1">
           {last7Days.map((day, index) => {
             const isActive = streakData.loginDates.includes(day.date);
@@ -180,13 +180,13 @@ function StreakWidget({ userId }: { userId: string | null }) {
                 <div
                   className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all duration-300 ${
                     isActive
-                      ? 'bg-gradient-to-br from-[#8ecae6]/40 to-[#8ecae6]/20 border border-[#8ecae6]/50 shadow-lg shadow-[#8ecae6]/20'
+                      ? 'bg-[#219ebc]/40 border border-[#219ebc]/50 shadow-lg shadow-[#8ecae6]/10'
                       : 'bg-white/5 border border-white/10 hover:border-white/20'
-                  } ${isToday ? 'ring-2 ring-[#8ecae6]/30 ring-offset-2 ring-offset-[#0d1117]' : ''}`}
+                  } ${isToday ? 'ring-2 ring-[#8ecae6]/30 ring-offset-2 ring-offset-[#023047]' : ''}`}
                 >
                   {isActive && <Flame className="w-4 h-4 text-[#8ecae6]" />}
                 </div>
-                <span className={`text-xs font-medium ${isToday ? 'text-[#8ecae6]' : 'text-gray-500'}`}>{day.fullLabel}</span>
+                <span className={`text-xs font-medium ${isToday ? 'text-[#8ecae6]' : 'text-gray-400'}`}>{day.fullLabel}</span>
               </div>
             );
           })}
@@ -196,23 +196,18 @@ function StreakWidget({ userId }: { userId: string | null }) {
         <div className="bg-white/5 rounded-xl p-2 border border-white/10">
           <div className="flex items-center gap-1 mb-1">
             <Flame className="w-3 h-3 text-[#8ecae6]/60" />
-            <p className="text-gray-500 text-xs uppercase tracking-wide">Current</p>
+            <p className="text-gray-400 text-xs uppercase tracking-wide">Current</p>
           </div>
-          <p className="text-white font-bold text-lg" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{streakData.currentStreak} <span className="text-gray-500 text-xs font-normal">days</span></p>
+          <p className="text-white font-bold text-lg" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{streakData.currentStreak} <span className="text-gray-400 text-xs font-normal">days</span></p>
         </div>
         <div className="bg-white/5 rounded-xl p-2 border border-white/10">
           <div className="flex items-center gap-1 mb-1">
             <TrendingUp className="w-3 h-3 text-[#8ecae6]/60" />
-            <p className="text-gray-500 text-xs uppercase tracking-wide">Best</p>
+            <p className="text-gray-400 text-xs uppercase tracking-wide">Best</p>
           </div>
-          <p className="text-white font-bold text-lg" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{streakData.longestStreak} <span className="text-gray-500 text-xs font-normal">days</span></p>
+          <p className="text-white font-bold text-lg" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>{streakData.longestStreak} <span className="text-gray-400 text-xs font-normal">days</span></p>
         </div>
       </div>
-      {streakData.currentStreak === 0 && (
-        <div className="mt-4 p-2 bg-[#8ecae6]/10 rounded-xl border border-[#8ecae6]/20">
-          <p className="text-[#8ecae6] text-xs text-center">Start your streak today! Log in daily to build momentum 🚀</p>
-        </div>
-      )}
     </div>
   );
 }
