@@ -61,11 +61,27 @@ export default function HomePage() {
               />
             </div>
             <span className="text-white/30">•</span>
-            <Image 
-              src="/Queen Mary Logo Blue.png" 
-              alt="Queen Mary University of London" 
-              width={140} 
-              height={40} 
+            <Image
+              src="/Queen Mary Logo Blue.png"
+              alt="Queen Mary University of London"
+              width={140}
+              height={40}
+              className="opacity-60 hover:opacity-100 transition-opacity brightness-0 invert"
+            />
+            <span className="text-white/30">•</span>
+            <Image
+              src="/Keele University Logo.png"
+              alt="Keele University"
+              width={140}
+              height={40}
+              className="opacity-60 hover:opacity-100 transition-opacity brightness-0 invert"
+            />
+            <span className="text-white/30">•</span>
+            <Image
+              src="/Leonardo Logo.png"
+              alt="Leonardo"
+              width={140}
+              height={40}
               className="opacity-60 hover:opacity-100 transition-opacity brightness-0 invert"
             />
           </div>
