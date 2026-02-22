@@ -78,9 +78,6 @@ export default function LoginPage() {
           </button>
         </div>
 
-        <p className="text-center mt-8 text-gray-600 text-[10px] font-bold tracking-widest uppercase">
-          Protected by enterprise-grade encryption
-        </p>
       </div>
     </div>
   );
