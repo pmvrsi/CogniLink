@@ -603,18 +603,36 @@ export default function DashboardPage() {
           {/* Streak Widget */}
           <StreakWidget userId={user?.id ?? null} />
           {documents.map(doc => (
-            <button
+            <div
               key={doc.id}
-              onClick={() => setActiveDoc(doc)}
-              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${activeDoc?.id === doc.id ? 'bg-[#219ebc]/20 border-[#219ebc]/40 text-[#8ecae6] animate-pop' : 'hover:bg-white/5 border-transparent text-gray-400 hover:text-white animate-hover-pop'}`}
+              className={`group w-full flex items-center gap-3 p-3 rounded-xl transition-all border ${activeDoc?.id === doc.id ? 'bg-[#219ebc]/20 border-[#219ebc]/40 text-[#8ecae6]' : 'hover:bg-white/5 border-transparent text-gray-400 hover:text-white'}`}
             >
-              <FileText className="w-4 h-4 flex-shrink-0" />
-              <div className="flex-1 text-left truncate">
-                <div className="text-sm font-bold truncate">{doc.name}</div>
-                <div className="text-[10px] opacity-50 uppercase tracking-tighter">{doc.status} // {doc.size}</div>
-              </div>
-              {activeDoc?.id === doc.id && <div className="w-1.5 h-1.5 rounded-full bg-[#8ecae6]" />}
-            </button>
+              <button
+                onClick={() => setActiveDoc(doc)}
+                className="flex items-center gap-3 flex-1 min-w-0 text-left"
+              >
+                <FileText className="w-4 h-4 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-bold truncate">{doc.name}</div>
+                  <div className="text-[10px] opacity-50 uppercase tracking-tighter">{doc.status} // {doc.size}</div>
+                </div>
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  setDocuments(prev => prev.filter(d => d.id !== doc.id));
+                  if (activeDoc?.id === doc.id) {
+                    setActiveDoc(null);
+                    setGraphData(null);
+                    setMessages([]);
+                  }
+                }}
+                className="opacity-0 group-hover:opacity-100 transition-opacity w-5 h-5 flex items-center justify-center rounded-md hover:bg-red-500/20 text-gray-500 hover:text-red-400 flex-shrink-0"
+                aria-label="Remove document"
+              >
+                ✕
+              </button>
+            </div>
           ))}
         </nav>
 
