@@ -66,38 +66,11 @@ cognilink/
 
 ---
 
-## Database Schema
+## Database Setup
 
-Run these in your Supabase SQL editor:
+CogniLink uses Supabase for Google OAuth, login streaks, and shared graph storage. Apply the project database migration in Supabase before running the app locally.
 
-```sql
--- Daily login tracking for streaks
-CREATE TABLE IF NOT EXISTS login_streaks (
-  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  user_id    UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  login_date DATE NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE (user_id, login_date)
-);
-ALTER TABLE login_streaks ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view their own streaks"
-  ON login_streaks FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can insert their own streaks"
-  ON login_streaks FOR INSERT WITH CHECK (auth.uid() = user_id);
-
--- Shared knowledge graphs (public read)
-CREATE TABLE IF NOT EXISTS shared_graphs (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID REFERENCES auth.users(id),
-  graph_data JSONB NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-ALTER TABLE shared_graphs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Anyone can read shared graphs"
-  ON shared_graphs FOR SELECT USING (true);
-CREATE POLICY "Users can insert their own graphs"
-  ON shared_graphs FOR INSERT WITH CHECK (auth.uid() = user_id);
-```
+The public README intentionally does not include production table definitions or security policies. Keep schema changes in private project migrations so local and deployed environments stay aligned.
 
 ---
 
@@ -164,7 +137,7 @@ Cogni is scoped to academic/educational queries only. Jailbreaks and off-topic r
 4. Configure Supabase:
    - Enable **Google** as an OAuth provider in Authentication → Providers
    - Add `http://localhost:3000/auth/callback` to your allowed redirect URLs
-   - Run the SQL above to create the required tables
+   - Apply the project database migration for streaks and shared graphs
 
 5. Start the dev server:
    ```bash
